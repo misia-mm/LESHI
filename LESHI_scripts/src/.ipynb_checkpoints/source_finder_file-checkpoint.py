@@ -355,7 +355,7 @@ def search_integrated_image(int_im_number, exclusion_zone_radius,median,popt_std
     image_width = integrated_image.shape[1]
     image_height = integrated_image.shape[0]
     
-    cent_coord = [int(integrated_image.shape[0]/2),int(integrated_image.shape[1]/2)]
+    #cent_coord = [int(integrated_image.shape[0]/2),int(integrated_image.shape[1]/2)]
     
     #find the initial sources on the integrated image 
     threshold_center = median + (exp_function(0.02,*popt_std))[0]*SNR_integrated_image_threshold
@@ -365,7 +365,8 @@ def search_integrated_image(int_im_number, exclusion_zone_radius,median,popt_std
     found_peaks_max_value = np.array(tbl['peak_value'])
 
     # check if the source max values are greater than threshold * estimated background for the given radius      
-    radiuses = np.sqrt( np.power(found_peaks_x_coord_array-cent_coord[0],2) +  np.power(found_peaks_y_coord_array-cent_coord[1],2))/image_radius
+    radiuses = np.sqrt( np.power(found_peaks_x_coord_array-cent_coord[0],2) +  np.power(found_peaks_y_coord_array-cent_coord[1],2)*(image_width/image_height))/image_width
+   
     threshold_for_each_source = median + exp_function(radiuses,*popt_std)*SNR_integrated_image_threshold
     above_threshold_mask = (found_peaks_max_value>=threshold_for_each_source)
 
@@ -373,6 +374,7 @@ def search_integrated_image(int_im_number, exclusion_zone_radius,median,popt_std
     initial_SNR = (found_peaks_max_value-median)/exp_function(radiuses,*popt_std)
 
     # filter out sources below threshold
+    plt.scatter(found_peaks_x_coord_array[above_threshold_mask],found_peaks_y_coord_array[above_threshold_mask],c=radiuses[above_threshold_mask], cmap='Spectral')
     found_peaks_x_coord_array = found_peaks_x_coord_array[above_threshold_mask]
     found_peaks_y_coord_array = found_peaks_y_coord_array[above_threshold_mask]
     found_peaks_max_value = found_peaks_max_value[above_threshold_mask]
@@ -447,18 +449,15 @@ def std_and_median_from_radius_function(image):
     std_array=np.array([])
     median_array=np.array([])
     for r in range(4):
-        #rin = rin_array[r]*image_radius
-        #rout = rout_array[r]*image_radius
+
         a_in = image_width/2*rin_array[r]
         a_out = image_width/2*rout_array[r]
-        b_out = image_height/2*rin_array[r]
+        b_out = image_height/2*rout_array[r]
         
         #aperture_annulus = CircularAnnulus(cent_coord, rin,rout)
         aperture_annulus = EllipticalAnnulus(cent_coord, a_in = a_in, a_out = a_out, b_out = b_out)
         mask= aperture_annulus.to_mask(method='center')
         image_slice = mask.multiply(image,fill_value=np.nan)
-        plt.imshow(image_slice)
-        plt.show()
         mean, median, std = sigma_clipped_stats(image_slice[~np.isnan(image_slice)], sigma=3.0)
         
         std_array = np.append(std_array,std)
