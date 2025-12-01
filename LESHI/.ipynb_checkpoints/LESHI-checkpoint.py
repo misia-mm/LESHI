@@ -5,8 +5,8 @@ from .src import detection_plot_file
 
 def source_finder(data_cube, path_to_results,
                        SNR_integ=3.5, SNR_channel=2.5, 
-                       sig_min_le=3,
-                       sig_max_len=100,
+                       channel_min_len=3,
+                       channel_max_len=100,
                        SNR_spec=3.5, rsqr_min=0.35,
                        int_image_len=10, int_image_load_no=10,
                        channel_start=0, channel_end=None, beam=None, test_hist=False, 
@@ -26,6 +26,12 @@ def source_finder(data_cube, path_to_results,
 
     SNR_channel : int or float
         Threshold signal-to-noise ratio of each source on the channel image (default = 2.5)
+
+    channel_min_len : int
+        Minimum number of channels that the signal persists for (default = 3)
+
+    channel_max_len : int
+        Maximal acceptable width of the signal in channels (default = 100)
 
     SNR_spec : int or float
         Threshold signal-to-noise ratio of each source on the spectrum (default = 3.5)
@@ -74,8 +80,8 @@ def source_finder(data_cube, path_to_results,
     if num % 2 == 0:
         source_finder_file.source_finder_func(data_cube, path_to_results,
                        SNR_integ, SNR_channel, 
-                       sig_min_len,
-                       sig_max_len,
+                       channel_min_len,
+                       channel_max_len,
                        SNR_spec, rsqr_min,
                        int_image_len,int_image_load_no,
                        channel_start,channel_end,beam,test_hist, 
@@ -83,7 +89,38 @@ def source_finder(data_cube, path_to_results,
     else:
         print('int_image_len should be an even number')
 
-def get_opt_cutout(ID,ra,dec,width_arc,filters,survey,path_to_images):
+def get_opt_cutout(ID,ra,dec,width_arc = 100, filters = ['G','R','I'], survey = 'LegacySurvey', path_to_images = './'):
+    """Start the LESHI Source Finder. 
+    
+    Parameters
+    ----------
+    ID : str or str array
+        ID of the source, optical images will be saved under this name.
+        
+    ra : float or float array
+        Right acsension in degrees of the coordinates of the center of the cutouts to download.
+        
+    dec : float or float array
+        Declination in degrees of the coordinates of the center of the cutouts to download.
+    
+    width_arc : float or float_array
+        Width of the cutouts in arcseconds (default = 100)
+
+    filters : str array
+        Array with filter names of cutouts to download (default = ['G','R','I'])
+
+    survey :  'HSC' or 'LegacySurvey'
+        Which survey cutouts to download (default = 'LegacySurvey')
+
+    path_to_images : str
+        Path to directory where the images should be saved (default is in the current directory)
+    
+    Returns
+    ------
+    output : none
+        Function does not return anything, all results are saved in the specified directory.
+    """
+    
     if survey == 'LegacySurvey':
         if not hasattr(ra, '__iter__'):
             ra,dec, ID, width_arc = np.array([ra]),np.array([dec]),np.array([ID]),np.array([width_arc]), 
