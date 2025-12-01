@@ -77,7 +77,7 @@ def source_finder(data_cube, path_to_results,
         Function does not return anything, all results are saved in the specified csv file.
     """
 
-    if num % 2 == 0:
+    if int_image_len % 2 == 0:
         source_finder_file.source_finder_func(data_cube, path_to_results,
                        SNR_integ, SNR_channel, 
                        channel_min_len,
