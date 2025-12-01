@@ -124,8 +124,13 @@ def calculate_spectral_SNR(flux_long,flux_central):
     #mean, median, std = sigma_clipped_stats(flux_long,sigma=3)
     flux_central = np.sort(flux_central)
     average_max_signal = np.nansum(flux_central[len(flux_central)-signal_persistence_threshold:])/signal_persistence_threshold
-    spectral_SNR_average = (average_max_signal-median)/std
-    spectral_SNR = (flux_central[-1]-median)/std
+    if std==0:
+        spectral_SNR_average = 0
+        spectral_SNR = 0
+        
+    else:
+        spectral_SNR_average = (average_max_signal-median)/std
+        spectral_SNR = (flux_central[-1]-median)/std
     return spectral_SNR, spectral_SNR_average
     
         
@@ -290,7 +295,10 @@ def local_background(x_coord,y_coord,integrated_image):
 def check_local_background(x_coord,y_coord,max_value,integrated_image,integrated_image_beam_diameter):
     bg_mean,bg_std = local_background(x_coord,y_coord,integrated_image)
     local_threshold = bg_mean + bg_std*SNR_integrated_image_threshold
-    int_SNR = (max_value-bg_mean)/bg_std
+    if bg_std==0:
+        int_SNR=0
+    else:
+        int_SNR = (max_value-bg_mean)/bg_std
 
     passed_beamsize = check_beamsize(x_coord,y_coord,integrated_image,integrated_image_beam_diameter,local_threshold)
     
@@ -492,7 +500,7 @@ def source_finder_func(data_file, path_to_results,
     while os.path.exists(path_to_results_dir):
         i=i+1
         path_to_results_dir = path_to_results+'/source_finding_results_%s'%(i)
-    os.mkdir(path_to_results_dir)
+    os.mkdirs(path_to_results_dir)
     
     core_number = multiprocessing.cpu_count()
     

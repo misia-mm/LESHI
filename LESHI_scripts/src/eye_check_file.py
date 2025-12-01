@@ -12,7 +12,7 @@ def save_results():
     while os.path.exists(path_to_results_dir):
         i=i+1
         path_to_results_dir = path_to_results+'flagging_results_%s'%(i)
-    os.mkdir(path_to_results_dir)
+    os.mkdirs(path_to_results_dir)
     data_frame.to_csv(path_to_results_dir+'/flagging_results_table.csv',index=False)
             
     current_image = image.copy()

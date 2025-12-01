@@ -500,7 +500,7 @@ def source_finder_func(data_file, path_to_results,
     while os.path.exists(path_to_results_dir):
         i=i+1
         path_to_results_dir = path_to_results+'/source_finding_results_%s'%(i)
-    os.mkdir(path_to_results_dir)
+    os.mkdirs(path_to_results_dir)
     
     core_number = multiprocessing.cpu_count()
     
