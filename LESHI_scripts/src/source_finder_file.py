@@ -19,7 +19,7 @@ from matplotlib.colors import Normalize
 import matplotlib.pyplot as plt
 
 from photutils.detection import find_peaks
-from photutils.aperture import CircularAperture, RectangularAperture, CircularAnnulus, ApertureStats
+from photutils.aperture import CircularAperture, RectangularAperture, CircularAnnulus, ApertureStats, EllipticalAnnulus
 
 import time
 import copy
@@ -351,6 +351,10 @@ def check_source_on_integrated_image(found_sources_dict):
 def search_integrated_image(int_im_number, exclusion_zone_radius,median,popt_std):
     integrated_image = integrated_image_list[int(int_im_number)]
     image_radius = int(integrated_image.shape[0]/2)
+
+    image_width = integrated_image.shape[1]
+    image_height = integrated_image.shape[0]
+    
     cent_coord = [int(integrated_image.shape[0]/2),int(integrated_image.shape[1]/2)]
     
     #find the initial sources on the integrated image 
@@ -377,7 +381,7 @@ def search_integrated_image(int_im_number, exclusion_zone_radius,median,popt_std
     
     number_of_sources = len(found_peaks_x_coord_array)
 
-    # generate dictionary with testing results for ecah source
+    # generate dictionary with testing results for each source
     source_dict = pd.DataFrame(data = {'ID':np.char.add(np.char.add(np.char.add('ID_',np.array(np.ones(number_of_sources)*np.round(integrated_image_central_channel_array[int(int_im_number+chunk*int_image_load_number)],0),dtype='int').astype(str)), '_'),np.arange(number_of_sources).astype(str)),
                     'x_coord':found_peaks_x_coord_array,'y_coord':found_peaks_y_coord_array,
                    'int_im_number':np.ones(number_of_sources)*int_im_number,
@@ -437,16 +441,24 @@ def std_and_median_from_radius_function(image):
     rin_array = np.array([0.2,0.4,0.6,0.8])
     rout_array = np.array([0.21,0.41,0.61,0.81])
 
+    image_width = image.shape[1]
+    image_height = image.shape[0]
+
     std_array=np.array([])
     median_array=np.array([])
     for r in range(4):
-        rin = rin_array[r]*image_radius
-        rout = rout_array[r]*image_radius
+        #rin = rin_array[r]*image_radius
+        #rout = rout_array[r]*image_radius
+        a_in = image_width/2*rin_array[r]
+        a_out = image_width/2*rout_array[r]
+        b_out = image_height/2*rin_array[r]
         
-        aperture_annulus = CircularAnnulus(cent_coord, rin,rout)
+        #aperture_annulus = CircularAnnulus(cent_coord, rin,rout)
+        aperture_annulus = EllipticalAnnulus(cent_coord, a_in = a_in, a_out = a_out, b_out = b_out)
         mask= aperture_annulus.to_mask(method='center')
         image_slice = mask.multiply(image,fill_value=np.nan)
-        
+        plt.imshow(image_slice)
+        plt.show()
         mean, median, std = sigma_clipped_stats(image_slice[~np.isnan(image_slice)], sigma=3.0)
         
         std_array = np.append(std_array,std)
@@ -494,13 +506,7 @@ def source_finder_func(data_file, path_to_results,
     bg_box_size = bg_box_size_input
     signal_length_max = signal_length_max_input
     max_dist_pix,max_dist_channel = max_dist_pix_input,max_dist_channel_input
-    # create folder for results
-    path_to_results_dir = path_to_results+'/source_finding_results_1'
-    i=1
-    while os.path.exists(path_to_results_dir):
-        i=i+1
-        path_to_results_dir = path_to_results+'/source_finding_results_%s'%(i)
-    os.makedirs(path_to_results_dir)
+    
     
     core_number = multiprocessing.cpu_count()
     
@@ -528,6 +534,14 @@ def source_finder_func(data_file, path_to_results,
                 
     else:
         beams_pixel_diameter_array = np.ones(cube_channel_range)*beam
+
+    # create folder for results
+    path_to_results_dir = path_to_results+'/source_finding_results_1'
+    i=1
+    while os.path.exists(path_to_results_dir):
+        i=i+1
+        path_to_results_dir = path_to_results+'/source_finding_results_%s'%(i)
+    os.makedirs(path_to_results_dir)
         
     # number of integrated images
     slab_half_length = int(int_image_length/2)
