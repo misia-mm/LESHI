@@ -367,7 +367,7 @@ def search_integrated_image(int_im_number, exclusion_zone_radius,median,popt_std
     # check if the source max values are greater than threshold * estimated background for the given radius      
     radiuses = np.sqrt( np.power(found_peaks_x_coord_array-cent_coord[0],2) +  np.power(found_peaks_y_coord_array-cent_coord[1],2)*(image_width/image_height))/image_width
    
-    threshold_for_each_source = median + exp_function(radiuses,*popt_std)*SNR_integrated_image_threshold
+    threshold_for_each_source = median + exp_function(radiuses,*popt_std)*SNR_integrated_image_threshold*0.75
     above_threshold_mask = (found_peaks_max_value>=threshold_for_each_source)
 
     # calculate SNR
