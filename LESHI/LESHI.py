@@ -89,7 +89,37 @@ def source_finder(data_cube, path_to_results,
     else:
         print('int_image_len should be an even number')
 
-def get_opt_cutout(ID,ra,dec,width_arc,filters,survey,path_to_images):
+def get_opt_cutout(ID,ra,dec,width_arc = 100, filters = ['G','R','I'], survey = 'LegacySurvey', path_to_images):
+    """Start the LESHI Source Finder. 
+    
+    Parameters
+    ----------
+    ID : str or str array
+        ID of the source, optical images will be saved under this name.
+        
+    ra : float or float array
+        Right acsension in degrees of the coordinates of the center of the cutouts to download.
+        
+    dec : float or float array
+        Declination in degrees of the coordinates of the center of the cutouts to download.
+    
+    width_arc : float or float_array
+        Width of the cutouts in arcseconds (default = 100)
+
+    filters : str array
+        Array with filter names of cutouts to download (default = ['G','R','I'])
+
+    survey :  'HSC' or 'LegacySurvey'
+        Which survey cutouts to download (default = 'LegacySurvey')
+
+    path_to_images : str
+        Path to directory where the images should be saved.
+    
+    Returns
+    ------
+    output : none
+        Function does not return anything, all results are saved in the specified directory.
+    """
     if survey == 'LegacySurvey':
         if not hasattr(ra, '__iter__'):
             ra,dec, ID, width_arc = np.array([ra]),np.array([dec]),np.array([ID]),np.array([width_arc]), 
