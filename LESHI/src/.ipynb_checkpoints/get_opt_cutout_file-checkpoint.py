@@ -6,28 +6,31 @@ import shutil
 import glob
 
 # get LG image
-def get_LG_image(ID,ra,dec,width_arc, filters,path_to_data):   
-    ra = round(ra,4)
-    dec = round(dec,4) # coordinates of the cutout
-    semi_width_deg = round(width_arc/3600/2,6)
-       
-    for photo_filter in filters:
-        # formulate the link from which wget will download the image, the link depends on the coordinates and size of the cutout, for example:
-        #       'http://www.legacysurvey.org/viewer/fits-cutout?ra=3.5167&dec=-23.1827&layer=ls-dr10&pixscale=0.262&size=5000&bands=g'
-        link = 'http://www.legacysurvey.org/viewer/fits-cutout?ra=%&dec=%&layer=ls-dr10&pixscale=%s&size=%s&bands=%s'%(ra,dec,pixscale,size,photo_filter)
-               
-        # formulate the file name in which wget will save the file, for example:
-        # G_image_cutout_ID.fits
-        file_name = '%sLegacySurvey_images_%s/%s_%s_image_cutout.fits'%(path_to_data,photo_filter,photo_filter,ID)
-        
-        # create directories for the filter images
-        path_exist = os.path.exists('%sLegacySurvey_images_%s'%(path_to_data,photo_filter))
-        if not path_exist:
-           os.makedirs('%sLegacySurvey_images_%s'%(path_to_data,photo_filter))
-
-        # download the images
-        os.system('wget --no-verbose -O %s "%s"'%(file_name,username,password,link))       
-    print('Finished dowloading cutouts')
+def get_LG_image(ID_array,ra_array,dec_array,width_arc_array, filters,path_to_data):   
+    for source in range(len(ra_array)):
+        ID = ID_array[source]
+        ra = round(ra_array[source],4)
+        dec = round(dec_array[source],4) # coordinates of the cutout
+        width_arc = width_arc_array[source]
+        semi_width_deg = round(width_arc/3600/2,6)
+           
+        for photo_filter in filters:
+            # formulate the link from which wget will download the image, the link depends on the coordinates and size of the cutout, for example:
+            #       'http://www.legacysurvey.org/viewer/fits-cutout?ra=3.5167&dec=-23.1827&layer=ls-dr10&pixscale=0.262&size=5000&bands=g'
+            link = 'http://www.legacysurvey.org/viewer/fits-cutout?ra=%&dec=%&layer=ls-dr10&pixscale=%s&size=%s&bands=%s'%(ra,dec,pixscale,size,photo_filter)
+                   
+            # formulate the file name in which wget will save the file, for example:
+            # G_image_cutout_ID.fits
+            file_name = '%sLegacySurvey_images_%s/%s_%s_image_cutout.fits'%(path_to_data,photo_filter,photo_filter,ID)
+            
+            # create directories for the filter images
+            path_exist = os.path.exists('%sLegacySurvey_images_%s'%(path_to_data,photo_filter))
+            if not path_exist:
+               os.makedirs('%sLegacySurvey_images_%s'%(path_to_data,photo_filter))
+    
+            # download the images
+            os.system('wget --no-verbose -O %s "%s"'%(file_name,username,password,link))       
+        print('Finished dowloading cutouts')
 
 
 # get HSC image
