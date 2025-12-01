@@ -439,7 +439,7 @@ def detection_plot_func(image_arc_width_input,spectrum_length_input,beam_input,p
     while os.path.exists(path_to_results_dir):
         i=i+1
         path_to_results_dir = path_to_results+'/detection_plots_%s/'%(i)
-    os.mkdirs(path_to_results_dir)
+    os.makedirs(path_to_results_dir)
     
     
 
