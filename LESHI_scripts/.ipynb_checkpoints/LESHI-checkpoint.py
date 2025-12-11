@@ -1,8 +1,3 @@
-from .src import eye_check_file
-from .src import source_finder_file
-from .src import get_opt_cutout_file
-from .src import detection_plot_file
-from .src import source_extent_file
 
 def source_finder(data_cube, path_to_results,
                        SNR_integ=3.5, SNR_channel=2.5, 
@@ -75,7 +70,7 @@ def source_finder(data_cube, path_to_results,
     output : pandas data frame
         Function returns the data table with found associated sources, the table is also saved in the specified directory.
     """
-
+    
     print(r' _        _______  _______          _________')
     print(r'( \      (  ____ \(  ____ \|\     /|\__   __/')
     print(r'| (      | (    \/| (    \/| )   ( |   ) (   ')
@@ -85,7 +80,7 @@ def source_finder(data_cube, path_to_results,
     print(r'| (____/\| (____/\/\____) || )   ( |___) (___')
     print(r'(_______/(_______/\_______)|/     \|\_______/')
     print('STARTING THE LESHI SOURCEFINDER')
-    
+    from .src import source_finder_file
     if int_image_len % 2 == 0:
         df = source_finder_file.source_finder_func(data_cube, path_to_results,
                        SNR_integ, SNR_channel, 
@@ -131,7 +126,7 @@ def get_opt_cutout(ID,ra,dec,width_arc = 100, filters = ['G','R','I'], survey = 
         Function does not return anything, all results are saved in the specified directory.
         
     """
-    
+    from .src import get_opt_cutout_file
     if survey == 'LegacySurvey':
         if not hasattr(ra, '__iter__'):
             ra,dec, ID, width_arc = np.array([ra]),np.array([dec]),np.array([ID]),np.array([width_arc]), 
@@ -146,16 +141,17 @@ def get_opt_cutout(ID,ra,dec,width_arc = 100, filters = ['G','R','I'], survey = 
 
         
 def eye_check(data_frame,path_to_figures,path_to_results):
+    from .src import eye_check_file
     eye_check_file.eye_check_func(data_frame,path_to_figures,path_to_results)
 
 def detection_plot(data_table, path_to_data_cube, path_to_optical_images, path_to_results,
                    image_arc_width,spectrum_length,beam):
-    
+    from .src import detection_plot_file
     detection_plot_file.detection_plot_func(image_arc_width,spectrum_length,beam,
                         path_to_optical_images,path_to_results,data_table,path_to_data_cube)
     
 def source_extent(data_table, data_cube, min_window_width_pix=100, beam_diam_arc=7):
-
+    from .src import source_extent_file
     df = source_extent_file.source_extent_script(data_table, data_cube, min_window_width_pix=100, beam_diam_arc=7)
     return df
 
