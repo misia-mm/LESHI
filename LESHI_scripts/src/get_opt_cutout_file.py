@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import os
-import wget
 import shutil
 import glob
 
