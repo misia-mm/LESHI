@@ -48,7 +48,7 @@ def log_likelihood(theta, x, y, yerr):
 
 def log_prior(theta):
     H, A, x0, sigma = theta
-    if 0.0 <= A and 0 <= x0 <= cube_channel_range and sigma < signal_length_max/6:
+    if 0.0 <= A and 0 <= x0 <= cube_channel_range and sigma>0:
         return 0.0
     return -np.inf
 
@@ -95,8 +95,8 @@ def check_source_gaussian_fit(found_sources_dict):
 
         while True:
             # get spectrum for beam pixels around source
-            half_width = int(5*round(int_image_length))
-            if half_width<50: half_width = 50
+            half_width = int(10*round(int_image_length))
+            if half_width<100: half_width = 100
             flux_cubelet_start = integrated_image_central_channel-half_width
             flux_cubelet_end = integrated_image_central_channel+half_width
             if flux_cubelet_start<cube_start: flux_cubelet_start=cube_start
@@ -106,7 +106,7 @@ def check_source_gaussian_fit(found_sources_dict):
             channels=np.arange(flux_cubelet_start,flux_cubelet_end,1)
             
             # check spectrum
-            found_sources_dict['rsqr'].values[source],found_sources_dict['x0'].values[source],found_sources_dict['sigma'].values[source], found_sources_dict['A'].values[source], found_sources_dict['H'].values[source] = fit_gauss(channels,flux)
+            found_sources_dict['rsqr'].values[source],found_sources_dict['gauss_x0'].values[source],found_sources_dict['gauss_sigma'].values[source], found_sources_dict['gauss_A'].values[source], found_sources_dict['gauss_H'].values[source] = fit_gauss(channels,flux)
             
             if found_sources_dict['rsqr'].values[source]<rsqr_threshold:
                 found_sources_dict['failed_spectral_fit'].values[source] = 1
@@ -133,15 +133,17 @@ def calculate_spectral_SNR(flux_long,flux_central):
         spectral_SNR = (flux_central[-1]-median)/std
     return spectral_SNR, spectral_SNR_average
     
-        
+    
 def get_beam_spectrum(x_coord,y_coord,integrated_image_beam_diameter,flux_cubelet_start,flux_cubelet_end):
     if flux_cubelet_start<cube_start: flux_cubelet_start=cube_start
     if flux_cubelet_end>cube_end: flux_cubelet_end=cube_end
 
+    radius = int(integrated_image_beam_diameter/2)-1
+    if radius<2.5: radius=2.5
 
     flux_cubelet = np.array(data_cube.unmasked_data[int(flux_cubelet_start):int(flux_cubelet_end),
-                                                y_coord-int(integrated_image_beam_diameter/2):y_coord+int(integrated_image_beam_diameter/2),
-                                                x_coord-int(integrated_image_beam_diameter/2):x_coord+int(integrated_image_beam_diameter/2)],dtype=np.float32)
+                                                y_coord-int(radius*3):y_coord+int(radius*3),
+                                                x_coord-int(radius*3):x_coord+int(radius*3)],dtype=np.float32)
     rows, cols = flux_cubelet.shape[1], flux_cubelet.shape[2]
     y, x = np.ogrid[:rows, :cols]
     center_row, center_col = (rows - 1) / 2, (cols - 1) / 2
@@ -149,8 +151,6 @@ def get_beam_spectrum(x_coord,y_coord,integrated_image_beam_diameter,flux_cubele
     
     flux = np.ones(int(flux_cubelet_end-flux_cubelet_start))
     for channel in range(len(flux)):
-        radius = int(integrated_image_beam_diameter/2)-1
-        if radius<2.5: radius=2.5
         (flux_cubelet[channel])[distance>radius] = np.nan
         flux[channel] = np.nansum(flux_cubelet[channel])
     return flux
@@ -277,12 +277,12 @@ def associate_sources(found_sources_dict):
             found_sources_dict['associated_with'].values[source] = found_sources_dict['ID'].values[match_id[np.argmax(found_sources_dict['spectral_SNR'].values[match_id])]]     
     return found_sources_dict
 
-def associate_sources_final(found_sources_dict):
+def associate_sources_final(found_sources_dict,max_dist_pix,max_dist_channel):
 
     for source in range(len(found_sources_dict)):
         dist = np.sqrt( (found_sources_dict['x_coord'].values[source] - found_sources_dict['x_coord'].values)**2 +
                         (found_sources_dict['y_coord'].values[source] - found_sources_dict['y_coord'].values)**2)
-        dist_channel = np.absolute(found_sources_dict['x0'].values[source]-found_sources_dict['x0'].values)
+        dist_channel = np.absolute(found_sources_dict['gauss_x0'].values[source]-found_sources_dict['gauss_x0'].values)
         match_id = np.arange(0,len(found_sources_dict))[(dist<max_dist_pix)&(dist_channel<=max_dist_channel)]
         found_sources_dict['associated_with'].values[source] = found_sources_dict['ID'].values[match_id[np.argmax(found_sources_dict['spectral_SNR'].values[match_id])]]     
     return found_sources_dict
@@ -367,7 +367,7 @@ def search_integrated_image(int_im_number, exclusion_zone_radius,median,popt_std
     # check if the source max values are greater than threshold * estimated background for the given radius      
     radiuses = np.sqrt( np.power(found_peaks_x_coord_array-cent_coord[0],2) +  np.power(found_peaks_y_coord_array-cent_coord[1],2)*(image_width/image_height))/(image_width/2)
    
-    threshold_for_each_source = median + exp_function(radiuses,*popt_std)*SNR_integrated_image_threshold*0.75
+    threshold_for_each_source = median + exp_function(radiuses,*popt_std)*SNR_integrated_image_threshold*0.8
     above_threshold_mask = (found_peaks_max_value>=threshold_for_each_source)
 
     # calculate SNR
@@ -390,8 +390,8 @@ def search_integrated_image(int_im_number, exclusion_zone_radius,median,popt_std
                    'int_im_channel':np.ones(number_of_sources)*integrated_image_central_channel_array[int(int_im_number+chunk*int_image_load_number)],
                    'int_initial_SNR':initial_SNR,'int_max_value':found_peaks_max_value,'int_SNR':-99*np.ones(number_of_sources),
                    'spectral_SNR':-99*np.ones(number_of_sources),'rsqr':-99*np.ones(number_of_sources),
-                   'x0':-99*np.ones(number_of_sources),'sigma':-99*np.ones(number_of_sources), 
-                   'A':-99*np.ones(number_of_sources),'H':-99*np.ones(number_of_sources),
+                   'gauss_x0':-99*np.ones(number_of_sources),'gauss_sigma':-99*np.ones(number_of_sources), 
+                   'gauss_A':-99*np.ones(number_of_sources),'gauss_H':-99*np.ones(number_of_sources),
                   'failed_beamsize':-99*np.ones(number_of_sources), 'failed_local_threshold':-99*np.ones(number_of_sources),
                   'failed_persistence':-99*np.ones(number_of_sources),'failed_spectral_SNR':-99*np.ones(number_of_sources),
                   'failed_spectral_fit':-99*np.ones(number_of_sources),
@@ -480,15 +480,14 @@ def integrate_image(int_im):
 def source_finder_func(data_file, path_to_results,
                        SNR_integrated_image_threshold_input, SNR_channel_frame_threshold_input, 
                        signal_persistence_threshold_input,
-                       signal_length_max_input,
                        SNR_spectrum_threshold_input, rsqr_threshold_input,
                        int_image_length_input,int_image_load_number_input,
-                       cube_start_input,cube_end_input,beam,output_test_history,bg_box_size_input,max_dist_pix_input,max_dist_channel_input ):
+                       cube_start_input,cube_end_input,beam,output_test_history,
+                       bg_box_size_input,max_dist_pix_input,max_dist_channel_input ):
 
     
     global  SNR_integrated_image_threshold, SNR_channel_frame_threshold, signal_persistence_threshold,\
             SNR_spectrum_threshold, rsqr_threshold,\
-            signal_length_max,\
             int_image_length,int_image_load_number,\
             cube_start,cube_end, bg_box_size,\
             data_cube, cube_width, cube_height, image_radius, cent_coord, cube_channel_range,\
@@ -503,9 +502,7 @@ def source_finder_func(data_file, path_to_results,
     int_image_length,int_image_load_number = int_image_length_input,int_image_load_number_input
     cube_start, cube_end = cube_start_input, cube_end_input
     bg_box_size = bg_box_size_input
-    signal_length_max = signal_length_max_input
     max_dist_pix,max_dist_channel = max_dist_pix_input,max_dist_channel_input
-    
     
     core_number = multiprocessing.cpu_count()
     
@@ -530,6 +527,7 @@ def source_finder_func(data_file, path_to_results,
                 beams_pixel_diameter_array = np.ones(len(data_cube.beam.value)) * data_cube.beam.major.value/3600/np.abs(data_cube_wcs.wcs.cdelt[0])
             except: 
                 print('SpectralCube failed to read the beam data, use "beam" argument to specify the beam diameter manually.')
+                print(beams_pixel_diameter_array)
                 
     else:
         beams_pixel_diameter_array = np.ones(cube_channel_range)*beam
@@ -548,6 +546,26 @@ def source_finder_func(data_file, path_to_results,
     
     # number of chunks
     chunk_number = int(np.ceil(cube_slab_number/int_image_load_number))
+
+    print('\n')
+    print('for following inputs:')
+    print('data_cube: %s'%(data_file))
+    print('path_to_results: %s'%(path_to_results))
+    print('SNR_integ: %s'%(SNR_integrated_image_threshold_input))
+    print('SNR_channel: %s'%(SNR_channel_frame_threshold_input))
+    print('channel_min_len: %s'%(signal_persistence_threshold_input))
+    print('SNR_spec: %s'%(SNR_spectrum_threshold_input))
+    print('rsqr_min: %s'%(rsqr_threshold_input))
+    print('int_image_len: %s'%(int_image_length_input))
+    print('int_image_load_no: %s'%(int_image_load_number_input))
+    print('channel_start: %s'%(cube_start_input))
+    print('channel_end: %s'%(cube_end_input))
+    print('beam: %s'%(beam))
+    print('bg_box_size: %s'%(bg_box_size_input))
+    print('max_dist_pix: %s'%(max_dist_pix_input))
+    print('max_dist_channel: %s'%(max_dist_channel_input))
+    print('test_hist: %s'%(output_test_history))
+    print('\n')
     
     print('Chosen width of frequency slab to be integrated: %s channels'%(int_image_length))
     print('Chosen number of channels to perform sourcefinding on: %s'%(cube_end-cube_start))
@@ -634,19 +652,20 @@ def source_finder_func(data_file, path_to_results,
         all_sources_dict['RA_deg'],all_sources_dict['Dec_deg'] = ra_array,dec_array
         all_sources_dict['frequency_Hz'] = frequency_array
     
-    
+        
         # save the results
         if output_test_history:
             if chunk==0: all_sources_dict.to_csv(path_to_results_dir+'/source_testing_history.csv',index=False,mode='a')
             else: all_sources_dict.to_csv(path_to_results_dir+'/source_testing_history.csv',index=False,mode='a',header=False)
             print('Source testing history saved to %s'%(path_to_results_dir+'/source_testing_history.csv')) 
     
-        frequency_array = channel_to_frequency(all_sources_dict['x0'].values,data_cube_wcs)
+        frequency_array = channel_to_frequency(all_sources_dict['gauss_x0'].values,data_cube_wcs)
         all_sources_dict['frequency_Hz'] = frequency_array
         all_sources_dict = all_sources_dict[all_sources_dict['failed_spectral_fit'].values==0]
-        if chunk==0: all_sources_dict.to_csv(path_to_results_dir+'/found_sources.csv',index=False,mode='a')
-        else: all_sources_dict.to_csv(path_to_results_dir+'/found_sources.csv',index=False,mode='a',header=False)
-        print('Results saved to %s'%(path_to_results_dir+'/found_sources.csv')) 
+        if chunk==0: all_sources_dict.to_csv(path_to_results_dir+'/found_sources_all.csv',index=False,mode='a')
+        else: all_sources_dict.to_csv(path_to_results_dir+'/found_sources_all.csv',index=False,mode='a',header=False)
+        print('Results saved to %s'%(path_to_results_dir+'/found_sources_all.csv')) 
+        print('Found %s sources'%(len(all_sources_dict)))
         
         del spectral_check_results
         del all_sources_dict
@@ -656,16 +675,19 @@ def source_finder_func(data_file, path_to_results,
         print('estimated time left: %s minutes'%round(((time.time()-start_time_slab)*(int(cube_slab_number/int_image_load_number)-chunk))/60,2))
         print('\n')
         
-    all_sources_dict=pd.read_csv(path_to_results_dir+'/found_sources.csv')
+    all_sources_dict=pd.read_csv(path_to_results_dir+'/found_sources_all.csv')
     all_sources_dict['redshift'] = (1420405751-all_sources_dict['frequency_Hz'].values)/all_sources_dict['frequency_Hz'].values
-    n_sources = len(all_sources_dict)
-    associated_sources_results = p_map(associate_sources_final,
-                                      [all_sources_dict[i*int((n_sources)/core_number+1):(i+1)*int((n_sources)/core_number+1)] for i in range(core_number)])
-    all_sources_dict = pd.concat(associated_sources_results)
+    all_sources_dict['z_channel'] = int(all_sources_dict['gauss_x0'].values)
+    
+    all_sources_dict = associate_sources_final(all_sources_dict,max_dist_pix,max_dist_channel)
+    all_sources_dict.to_csv(path_to_results_dir+'/found_sources_all.csv',index=False,columns=['ID','x_coord','y_coord','z_channel','RA_deg','Dec_deg','frequency_Hz','redshift','int_SNR','spectral_SNR','rsqr','gauss_x0','gauss_sigma','gauss_A','gauss_H','associated_with'])
     
     filter_associated = (all_sources_dict['ID'].values==all_sources_dict['associated_with'].values)
     all_sources_dict = all_sources_dict[filter_associated]
     
     all_sources_dict = all_sources_dict.sort_values(by='spectral_SNR',ascending=False)
-    all_sources_dict.to_csv(path_to_results_dir+'/found_sources_associated.csv',index=False)
+    all_sources_dict.to_csv(path_to_results_dir+'/found_sources_associated.csv',index=False,columns=['ID','x_coord','y_coord','z_channel','RA_deg','Dec_deg','frequency_Hz','redshift','int_SNR','spectral_SNR','rsqr','gauss_x0','gauss_sigma','gauss_A','gauss_H'])
+    print('Found %s sources'%(len(all_sources_dict)))
+
+    return all_sources_dict
 

@@ -13,7 +13,11 @@ def get_LG_image(ID_array,ra_array,dec_array,width_arc_array, filters,path_to_da
         dec = round(dec_array[source],4) # coordinates of the cutout
         width_arc = width_arc_array[source]
         semi_width_deg = round(width_arc/3600/2,6)
-           
+        size = width_arc/0.26
+        if size>3000:
+            size=3000
+            pixscale = width_arc/3000
+
         for photo_filter in filters:
             # formulate the link from which wget will download the image, the link depends on the coordinates and size of the cutout, for example:
             #       'http://www.legacysurvey.org/viewer/fits-cutout?ra=3.5167&dec=-23.1827&layer=ls-dr10&pixscale=0.262&size=5000&bands=g'
@@ -24,9 +28,9 @@ def get_LG_image(ID_array,ra_array,dec_array,width_arc_array, filters,path_to_da
             file_name = '%sLegacySurvey_images_%s/%s_%s_image_cutout.fits'%(path_to_data,photo_filter,photo_filter,ID)
             
             # create directories for the filter images
-            path_exist = os.path.exists('%sLegacySurvey_images_%s'%(path_to_data,photo_filter))
+            path_exist = os.path.exists('%s/optical_images_filter_%s'%(path_to_data,photo_filter))
             if not path_exist:
-               os.makedirs('%sLegacySurvey_images_%s'%(path_to_data,photo_filter))
+               os.makedirs('%s/optical_images_filter_%s'%(path_to_data,photo_filter))
     
             # download the images
             os.system('wget --no-verbose -O %s "%s"'%(file_name,username,password,link))       
@@ -50,9 +54,9 @@ def get_HSC_image(ID,ra,dec,width_arc, filters,path_to_data):
         file_name = '%sHSC_images_%s/%s_%s_image_cutout.fits'%(path_to_data,photo_filter,photo_filter,ID)
         
         # create directories for the filter images
-        path_exist = os.path.exists('%sHSC_images_%s'%(path_to_data,photo_filter))
+        path_exist = os.path.exists('%s/optical_images_filter_%s'%(path_to_data,photo_filter))
         if not path_exist:
-           os.makedirs('%sHSC_images_%s'%(path_to_data,photo_filter))
+           os.makedirs('%s/optical_images_filter_%s'%(path_to_data,photo_filter))
 
         # download the images
         username = 'michalinamm' # these login details are mine, however it is very straightforward to register
@@ -65,9 +69,9 @@ def get_HSC_image_in_bulk(ID_array,ra_array,dec_array,width_arc_array, filters,p
     
     for photo_filter in filters:
         # create directories for the filter images
-        path_exist = os.path.exists('%sHSC_images_%s'%(path_to_data,photo_filter))
+        path_exist = os.path.exists('%s/optical_images_filter_%s'%(path_to_data,photo_filter))
         if not path_exist:
-           os.makedirs('%sHSC_images_%s'%(path_to_data,photo_filter))
+           os.makedirs('%s/optical_images_filter_%s'%(path_to_data,photo_filter))
 
         # prepare a table to upload coordinates
         target_table['filter'] = np.full(len(ra_array),'HSC-'+photo_filter)
@@ -92,10 +96,13 @@ def get_HSC_image_in_bulk(ID_array,ra_array,dec_array,width_arc_array, filters,p
 
                 # formulate the file name to which save the file, for example:
                 # G_ID_12_1234_image_cutout.fits
-                file_name = '%sHSC_images_%s/%s_%s_image_cutout.fits'%(path_to_data,photo_filter,photo_filter,ID_array[source])
+                file_name = '%s/optical_images_filter_%s/%s_%s_image_cutout.fits'%(path_to_data,photo_filter,photo_filter,ID_array[source])
                 os.system('mv %s %s'%(file,file_name))
             except:
                 print('missing file')
+                file_name = '%s/optical_images_filter_%s/%s_%s_image_cutout_fail.txt'%(path_to_data,photo_filter,photo_filter,ID_array[source])
+                with open(file_name, "w") as text_file:
+                    text_file.write("failed to download the image")
                 
         # clean up
         os.system('rm -rf %s'%(folder))

@@ -69,7 +69,7 @@ def ini_plot(x_pix_coord,y_pix_coord,ra,dec,source_ID):
     axradioimage = fig.add_subplot(gs[2, 0:5],projection=wcs_radio_image)
 
     try:
-        file_g = glob.glob(path_to_optical_images+'/HSC_images_R/*%s*.fits'%(source_ID))[0]
+        file_g = glob.glob(path_to_optical_images+'/HSC_images_R/*%s_*.fits'%(source_ID))[0]
         g=fits.open(file_g)
         wcs_vis = WCS(g[1].header)
         ra = round(ra,4)
@@ -158,10 +158,12 @@ def get_beam_spectrum(x_coord,y_coord,beam_diameter,flux_cubelet_start,flux_cube
     if flux_cubelet_start<0: flux_cubelet_start=0
     if flux_cubelet_end>cube_channel_range: flux_cubelet_end=cube_channel_range
 
-
+    radius = int(beam_diameter/2)-1
+    if radius<2.5: radius=2.5
+            
     flux_cubelet = np.array(data_cube.unmasked_data[int(flux_cubelet_start):int(flux_cubelet_end),
-                                                y_coord-int(beam_diameter/2):y_coord+int(beam_diameter/2),
-                                                x_coord-int(beam_diameter/2):x_coord+int(beam_diameter/2)],dtype=np.float32)
+                                                y_coord-int(radius*3):y_coord+int(radius*3),
+                                                x_coord-int(radius*3):x_coord+int(radius*3)],dtype=np.float32)
     rows, cols = flux_cubelet.shape[1], flux_cubelet.shape[2]
     y, x = np.ogrid[:rows, :cols]
     center_row, center_col = (rows - 1) / 2, (cols - 1) / 2
@@ -169,8 +171,6 @@ def get_beam_spectrum(x_coord,y_coord,beam_diameter,flux_cubelet_start,flux_cube
     
     flux = np.ones(int(flux_cubelet_end-flux_cubelet_start))
     for channel in range(len(flux)):
-        radius = int(beam_diameter/2)-1
-        if radius<2.5: radius=2.5
         (flux_cubelet[channel])[distance>radius] = np.nan
         flux[channel] = np.nansum(flux_cubelet[channel])
     return flux
@@ -189,8 +189,8 @@ def wide_spectrum_plot(axspectrumwide,wavelength_range_array_wide,x_coord,y_coor
     xdata = channel_to_frequency(wavelength_range_array_wide,data_cube_wcs)/1E6
     ydata = flux*bmpix*dfreq # flux in Jy Hz
     
-    axspectrumwide.set_ylim((np.min(ydata)-0.1*np.absolute(np.max(ydata)-np.min(ydata))),np.max(ydata)+0.15*np.absolute(np.max(ydata)-np.min(ydata)))
-    axspectrumwide.set_xlim(np.min(xdata),np.max(xdata))
+    axspectrumwide.set_ylim((np.nanmin(ydata)-0.1*np.absolute(np.nanmax(ydata)-np.nanmin(ydata))),np.nanmax(ydata)+0.15*np.absolute(np.nanmax(ydata)-np.nanmin(ydata)))
+    axspectrumwide.set_xlim(np.nanmin(xdata),np.nanmax(xdata))
   
     #axspectrumwide.step(xdata,ydata,color = 'black',alpha=0.45,lw=0.7)
     axspectrumwide.step(xdata,ydata,color = 'black',alpha=0.5,lw=0.75,label='spectrum')
@@ -235,9 +235,9 @@ def optical_image_plot(axvisimage,sources_dict,source,beam_radius_pixel):
     source_ID = sources_dict['ID'].values[source]
 
     width_arc = round(image_arc_width,6)
-    file_g = glob.glob(path_to_optical_images+'/HSC_images_R/*%s*.fits'%(source_ID))[0]
-    file_b = glob.glob(path_to_optical_images+'/HSC_images_G/*%s*.fits'%(source_ID))[0]
-    file_r = glob.glob(path_to_optical_images+'/HSC_images_I/*%s*.fits'%(source_ID))[0]
+    file_g = glob.glob(path_to_optical_images+'/HSC_images_R/*%s_*.fits'%(source_ID))[0]
+    file_b = glob.glob(path_to_optical_images+'/HSC_images_G/*%s_*.fits'%(source_ID))[0]
+    file_r = glob.glob(path_to_optical_images+'/HSC_images_I/*%s_*.fits'%(source_ID))[0]
     
     r = fits.open(file_r)
     g=fits.open(file_g)
@@ -262,8 +262,8 @@ def optical_image_plot(axvisimage,sources_dict,source,beam_radius_pixel):
     # b_image=np.sqrt(np.absolute(b[1].data))
     
     
-    min_r,min_b,min_g = np.min(r_image),np.min(b_image),np.min(g_image)
-    max_r,max_b,max_g = np.max(r_image),np.max(b_image),np.max(g_image)
+    min_r,min_b,min_g = np.nanmin(r_image),np.nanmin(b_image),np.nanmin(g_image)
+    max_r,max_b,max_g = np.nanmax(r_image),np.nanmax(b_image),np.nanmax(g_image)
     
     
     rgb = make_lupton_rgb(r_image*0.9,g_image,b_image*1.3,Q=2.5,stretch=1.1)
@@ -369,7 +369,7 @@ def make_plot(sources_dict):
                 except: 
                     print('SpectralCube failed to read the beam data, use "beam" argument to specify the beam diameter manually.')
         else:
-            beams_arc_diameter_array = np.ones(cube_channel_range)*beam
+            beams_arc_diameter_array = np.ones(cube_channel_range)*beam*(3600*np.abs(data_cube_wcs.wcs.cdelt[0]))
 
         beams_pixel_diameter_array =  beams_arc_diameter_array/3600/np.abs(data_cube_wcs.wcs.cdelt[0])
 
@@ -380,6 +380,8 @@ def make_plot(sources_dict):
         
         slab_half_length=2
         cube_slab_number = 429
+
+        
         integrated_image_beam_diameter_array = np.array( [np.median(beams_pixel_diameter_array[slab_half_length*int_im+cube_start : (cube_start + slab_half_length*(int_im+2) )]) for int_im in range(cube_slab_number)])
         integrated_image_beam_diameter_array[-1] = np.median(beams_pixel_diameter_array[slab_half_length*(cube_slab_number-1)+cube_start : cube_end])
         beam_diameter_pixel =  integrated_image_beam_diameter_array[int(sources_dict['int_im_number'].values[source])]

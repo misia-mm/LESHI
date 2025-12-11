@@ -189,8 +189,8 @@ def wide_spectrum_plot(axspectrumwide,wavelength_range_array_wide,x_coord,y_coor
     xdata = channel_to_frequency(wavelength_range_array_wide,data_cube_wcs)/1E6
     ydata = flux*bmpix*dfreq # flux in Jy Hz
     
-    axspectrumwide.set_ylim((np.min(ydata)-0.1*np.absolute(np.max(ydata)-np.min(ydata))),np.max(ydata)+0.15*np.absolute(np.max(ydata)-np.min(ydata)))
-    axspectrumwide.set_xlim(np.min(xdata),np.max(xdata))
+    axspectrumwide.set_ylim((np.nanmin(ydata)-0.1*np.absolute(np.nanmax(ydata)-np.nanmin(ydata))),np.nanmax(ydata)+0.15*np.absolute(np.nanmax(ydata)-np.nanmin(ydata)))
+    axspectrumwide.set_xlim(np.nanmin(xdata),np.nanmax(xdata))
   
     #axspectrumwide.step(xdata,ydata,color = 'black',alpha=0.45,lw=0.7)
     axspectrumwide.step(xdata,ydata,color = 'black',alpha=0.5,lw=0.75,label='spectrum')
@@ -262,8 +262,8 @@ def optical_image_plot(axvisimage,sources_dict,source,beam_radius_pixel):
     # b_image=np.sqrt(np.absolute(b[1].data))
     
     
-    min_r,min_b,min_g = np.min(r_image),np.min(b_image),np.min(g_image)
-    max_r,max_b,max_g = np.max(r_image),np.max(b_image),np.max(g_image)
+    min_r,min_b,min_g = np.nanmin(r_image),np.nanmin(b_image),np.nanmin(g_image)
+    max_r,max_b,max_g = np.nanmax(r_image),np.nanmax(b_image),np.nanmax(g_image)
     
     
     rgb = make_lupton_rgb(r_image*0.9,g_image,b_image*1.3,Q=2.5,stretch=1.1)
@@ -369,7 +369,7 @@ def make_plot(sources_dict):
                 except: 
                     print('SpectralCube failed to read the beam data, use "beam" argument to specify the beam diameter manually.')
         else:
-            beams_arc_diameter_array = np.ones(cube_channel_range)*beam
+            beams_arc_diameter_array = np.ones(cube_channel_range)*beam*(3600*np.abs(data_cube_wcs.wcs.cdelt[0]))
 
         beams_pixel_diameter_array =  beams_arc_diameter_array/3600/np.abs(data_cube_wcs.wcs.cdelt[0])
 
