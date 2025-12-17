@@ -93,7 +93,8 @@ def moment_0_map(xpix,ypix,zchannel_left,zchannel_right,map_size,cube,cube_data,
     if xpix_right>cube_data.shape[2]: xpix_right = cube_data.shape[2]-1
 
     cubelet=cube[zchannel_left:zchannel_right,ypix_left:ypix_right,xpix_left:xpix_right]
-
+    
+    cubelet.beam_threshold = [100]
     moment_0 = cubelet.moment(order=0) 
     wcs_moment_0 = moment_0.wcs
     moment_0 = moment_0.value
@@ -111,7 +112,6 @@ def read_in_radio_file(radio_file):
     cube_data = cube.unmasked_data[:,:,:].value
     wcs_cube = cube.wcs
     cube_channel_length = cube_data.shape[0]
-    dpix = np.abs(wcs_cube.cdelt[0])*3600
     dpix=np.abs(wcs_cube.wcs.cdelt[0])*3600
     return cube, cube_data, wcs_cube, cube_channel_length,dpix
 
@@ -182,7 +182,7 @@ def log_likelihood_busy(theta, x, y, yerr):
 
 def log_prior_busy(x,theta):
     xp, xe, a, w, b, c, C = theta
-    if a>0 and  w>=3 and 100>b>=0 and c>=0:
+    if 100000>a>0 and  100000>w>=3 and 100>b>=0 and c>=0 and xp<cube_channel_length and xe<cube_channel_length and C<100000:
         return 0.0
 
     return -np.inf
@@ -213,16 +213,19 @@ def fit_busy(x,y,source):
     pos = [source_data_table['fit_xp'].values[source],source_data_table['fit_xe'].values[source],
            source_data_table['fit_a'].values[source], source_data_table['fit_w'].values[source],
            source_data_table['fit_b'].values[source],source_data_table['fit_c'].values[source],
-           source_data_table['fit_C'].values[source]]+1e-4 * np.random.randn(32, 7)
+           source_data_table['fit_C'].values[source]]+1e-3 * np.random.randn(32, 7)
     pos = np.abs(pos)
     nwalkers, ndim = pos.shape
     
     mean, median, yerr = sigma_clipped_stats(y, sigma=3,maxiters=None)
     #yerr=np.abs(np.max(y)-np.min(y))*0.01
     if yerr==0: yerr=0.0001
-        
-    sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability_busy, args=(x, y, yerr))
-    sampler.run_mcmc(pos, 2000, progress=False);
+
+    try:
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability_busy, args=(x, y, yerr))
+        sampler.run_mcmc(pos, 2000, progress=False)
+    except:
+        print(pos)
     flat_samples = sampler.get_chain(discard=200, thin=10, flat=True)
     
 
@@ -302,7 +305,7 @@ def find_source_extent(source_data_table_input):
     global source_data_table
     source_data_table = source_data_table_input
 
-    source_data_table['half_width'] = np.ones(len(source_data_table))*np.array(source_data_table['gauss_x0'].values)*2
+    source_data_table['half_width'] = np.ones(len(source_data_table))*np.array(source_data_table['gauss_sigma'].values)*2
     source_data_table['contour_flag'] = np.ones(len(source_data_table))
     source_data_table['contour_diameter_arc'] = np.ones(len(source_data_table))*beam_arc
     
@@ -414,7 +417,7 @@ def find_source_extent(source_data_table_input):
                 source_data_table['contour_flag'].values[source] = 0
                 break
             contour_size.append(len(mask[mask==True]))
-            print(contour_size)
+            #print(contour_size)
             
             # update the size, center and range of the cubelet
             x_center_contour,y_center_contour = contour_center(source_contour)
@@ -471,24 +474,27 @@ def associate_sources_final(found_sources_dict):
         dist = np.sqrt( (found_sources_dict['x_coord'].values[source] - found_sources_dict['x_coord'].values)**2 +
                         (found_sources_dict['y_coord'].values[source] - found_sources_dict['y_coord'].values)**2)
         dist_channel = np.absolute(found_sources_dict['x0_busy'].values[source]-found_sources_dict['x0_busy'].values)
-        match_id = np.arange(0,len(found_sources_dict))[(dist<found_sources_dict['contour_diameter_arc'].values[source]/3*dpix)&(dist_channel<=found_sources_dict['half_width'].values)]
+        match_id = np.arange(0,len(found_sources_dict))[(dist<found_sources_dict['contour_diameter_arc'].values[source]/3*dpix)&(dist_channel<=found_sources_dict['half_width'].values[source])]
         found_sources_dict['associated_with'].values[source] = found_sources_dict['ID'].values[match_id[np.argmax(found_sources_dict['int_SNR'].values[match_id])]]     
     return found_sources_dict
 
-def source_extent_script(data_table, path_to_radio_file, initial_map_size_pix_input, beam_arc):
-    global cube, cube_data, wcs_cube, cube_channel_length, initial_map_size_pix, beam_pix, dpix
+def source_extent_script(data_table, path_to_radio_file, initial_map_size_pix_input, beam_arc_input):
+    global cube, cube_data, wcs_cube, cube_channel_length, initial_map_size_pix, beam_arc, dpix
     initial_map_size_pix = initial_map_size_pix_input
     cube, cube_data, wcs_cube, cube_channel_length, dpix=read_in_radio_file(path_to_radio_file)
-
+    beam_arc = beam_arc_input
     core_number = multiprocessing.cpu_count()
     n_sources = len(data_table)
     core_number = n_sources
     source_extent_results = p_map(find_source_extent,
                                       [data_table[i:(i+1)] for i in range(core_number)])
-    data_table = pd.concat(source_extent_results)
-
-    data_table.to_csv('found_sources_extent.csv',index='False')
+    all_sources_dict = pd.concat(source_extent_results)
+    all_sources_dict = associate_sources_final(all_sources_dict)
+    filter_associated = (all_sources_dict['ID'].values==all_sources_dict['associated_with'].values)
+    all_sources_dict = all_sources_dict[filter_associated]
     
-    return data_table
+    all_sources_dict.to_csv('found_sources_extent.csv',index=False)
+    
+    return all_sources_dict
 
     

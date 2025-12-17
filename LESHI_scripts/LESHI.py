@@ -70,15 +70,29 @@ def source_finder(data_cube, path_to_results,
     output : pandas data frame
         Function returns the data table with found associated sources, the table is also saved in the specified directory.
     """
-    
-    print(r' _        _______  _______          _________')
-    print(r'( \      (  ____ \(  ____ \|\     /|\__   __/')
-    print(r'| (      | (    \/| (    \/| )   ( |   ) (   ')
-    print(r'| |      | (__    | (_____ | (___) |   | |   ')
-    print(r'| |      |  __)   (_____  )|  ___  |   | |   ')
-    print(r'| |      | (            ) || (   ) |   | |   ')
-    print(r'| (____/\| (____/\/\____) || )   ( |___) (___')
-    print(r'(_______/(_______/\_______)|/     \|\_______/')
+
+
+
+          
+    print( '    @   @                                            @.  ..    ')  
+    print( '@   @@  @.                                           @. .@.  .@')  
+    print( '@@   @@.@.        .@.                     @:         @@@@.  .@.')  
+    print( ' @@.  @@@.          @.                   @.          @@@.  .@. ')  
+    print( '  @@.  @@.          .@.                 @@           @@.  @@.  ')  
+    print( '   .@@@@@@@          @@@.             .@@          .@@@@@@@    ')  
+    print( '       .@@@@@@.....@@@@@@@@@@.  .@@@@@@@@@@.    .@@@@@..       ')  
+    print( '            .@@@@@@@..           .  . ....@@@@@@@@.            ') 
+    print(r"       _____     ________   ______   ____  ____  _____ ") 
+    print(r"      |_   _|   |_   __  |.' ____ \ |_   ||   _||_   _|") 
+    print(r"        | |       | |_ \_|| (___ \_|  | |__| |    | |  ") 
+    print(r"        | |   _   |  _| _  _.____`.   |  __  |    | |  ") 
+    print(r"       _| |__/ | _| |__/ || \____) | _| |  | |_  _| |_ ") 
+    print(r"      |________||________| \______.'|____||____||_____|") 
+    print( '         Line    Emisssion  Source -  Hunting  Integrator')
+    print('\n')
+    print('for more information see: https://github.com/misia-mm/LESHI')
+    print('please report any issues to: michalina.maksymowicz.maciata@gmail.com')
+    print('\n')
     print('STARTING THE LESHI SOURCEFINDER')
     from .src import source_finder_file
     if int_image_len % 2 == 0:
@@ -152,6 +166,7 @@ def detection_plot(data_table, path_to_data_cube, path_to_optical_images, path_t
     
 def source_extent(data_table, data_cube, min_window_width_pix=100, beam_diam_arc=7):
     from .src import source_extent_file
-    df = source_extent_file.source_extent_script(data_table, data_cube, min_window_width_pix=100, beam_diam_arc=7)
+    
+    df = source_extent_file.source_extent_script(data_table, data_cube, min_window_width_pix, beam_diam_arc)
     return df
 

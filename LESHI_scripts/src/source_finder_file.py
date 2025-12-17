@@ -25,6 +25,11 @@ import time
 import copy
 import os
 
+import warnings
+
+# Convert RuntimeWarning into an exception
+warnings.filterwarnings("error", category=RuntimeWarning)
+
 # get sky coordinates in degrees from pixel coordinates
 def sky_coord_in_deg_from_pix(x_pix_coord,y_pix_coord,wcs):
     skycoord = SkyCoord.from_pixel(xp=x_pix_coord,yp=y_pix_coord, wcs=wcs)
@@ -79,10 +84,26 @@ def fit_gauss(x,y):
     fit_A = np.percentile(flat_samples[:, 1], [50])
     fit_x0 = np.percentile(flat_samples[:, 2], [50])
     fit_sigma = np.percentile(flat_samples[:, 3], [50])
-    
-    fit_y = gauss(x, fit_H, fit_A, fit_x0, fit_sigma) 
 
-    rsqr = 1- (np.nansum((y-fit_y)**2))/(np.nansum((y-np.nansum(y)/len(y))**2))
+    rsqr_array = np.ones(5)
+    for i in range(5):
+        if 6*fit_sigma<20:
+            left_border = 1+np.linspace(0,int(len(x)/2-20),5)[i] 
+            right_border = -1-np.linspace(0,int(len(x)/2-20),5)[i]
+        elif 6*fit_sigma>=int(len(x)/2):
+            left_border = 1+np.linspace(0,int(len(x)/4),5)[i] 
+            right_border = -1-np.linspace(0,int(len(x)/4),5)[i]
+        else:
+            left_border = 1+np.linspace(0,int(len(x)/2-6*fit_sigma),5)[i] 
+            right_border = -1-np.linspace(0,int(len(x)/2-6*fit_sigma),5)[i] 
+        y_central = y[int(left_border):int(right_border)]
+        x_central = x[int(left_border):int(right_border)]
+    
+        fit_y = gauss(x_central, fit_H, fit_A, fit_x0, fit_sigma) 
+
+        rsqr_array[i] = 1- (np.nansum((y_central-fit_y)**2))/(np.nansum((y_central-np.nansum(y_central)/len(y_central))**2))
+        
+    rsqr = np.max(rsqr_array)
     return rsqr, fit_x0[0], fit_sigma[0], fit_A[0], fit_H[0]
 
 def check_source_gaussian_fit(found_sources_dict):
@@ -163,10 +184,19 @@ def find_sequence(arr,seq):
 
 def check_persistence(x_coord,y_coord,integrated_image_beam_diameter,integrated_image_central_channel):
     # estimate frame background noise
-    if integrated_image_beam_diameter<5:integrated_image_beam_diameter=5
+    if integrated_image_beam_diameter<4:integrated_image_beam_diameter=4
+
+    ypix_left, ypix_right = int(y_coord-(bg_box_size/2)), int(y_coord+(bg_box_size/2))
+    if ypix_left<0: ypix_left=0
+    if ypix_right>data_cube.shape[1]: ypix_right = data_cube.shape[1]-1
+        
+    xpix_left, xpix_right = int(x_coord-(bg_box_size/2)), int(x_coord+(bg_box_size/2))
+    if xpix_left<0: xpix_left=0
+    if xpix_right>data_cube.shape[2]: xpix_right = data_cube.shape[2]-1
+        
     image_around_source = np.array(data_cube.unmasked_data[integrated_image_central_channel,
-                                   int(y_coord-bg_box_size/2):int(y_coord+bg_box_size/2),
-                                   int(x_coord-bg_box_size/2):int(x_coord+bg_box_size/2)],dtype=np.float32)
+                                   ypix_left:ypix_right,
+                                   xpix_left:xpix_right],dtype=np.float32)
     mean, median, std = sigma_clipped_stats(image_around_source[~np.isnan(image_around_source)],sigma=3)
     frame_threshold = median+std*SNR_channel_frame_threshold
 
@@ -179,6 +209,7 @@ def check_persistence(x_coord,y_coord,integrated_image_beam_diameter,integrated_
     cubelet_around_source = np.array(data_cube.unmasked_data[cubelet_start:cubelet_end,
                             y_coord-int(integrated_image_beam_diameter):y_coord+int(integrated_image_beam_diameter),
                             x_coord-int(integrated_image_beam_diameter):x_coord+int(integrated_image_beam_diameter)],dtype=np.float32)
+    
     rows, cols = cubelet_around_source.shape[1], cubelet_around_source.shape[2]
     y, x = np.ogrid[:rows, :cols]
     center_row, center_col = (rows - 1) / 2, (cols - 1) / 2
@@ -189,12 +220,14 @@ def check_persistence(x_coord,y_coord,integrated_image_beam_diameter,integrated_
         (channel_frame_around_source)[distance>int(integrated_image_beam_diameter/2)] = np.nan
         channel_frame_around_source[0][0]=0
 
-        if np.nanmax(channel_frame_around_source)>frame_threshold:
+        if np.nanmax(channel_frame_around_source)>frame_threshold: # check if max value is bigger that threshold SNR
             channel_frame_around_max_value = cubelet_around_source[channel]
             idx = np.unravel_index(np.nanargmax(channel_frame_around_source), channel_frame_around_source.shape)
             distance_from_max = np.sqrt((x - idx[1])**2 + (y - idx[0])**2)
             (channel_frame_around_max_value)[distance_from_max>int(integrated_image_beam_diameter/2)] = np.nan
             beam_area = len(channel_frame_around_max_value[~np.isnan(channel_frame_around_max_value)])
+            
+            # check if values within beam around the max value are bigger than half of threshold SNR
             if len(channel_frame_around_max_value[channel_frame_around_max_value>0.5*frame_threshold])>=beam_area-1:
                 signal_in_channel[channel] = True
 
@@ -288,8 +321,20 @@ def associate_sources_final(found_sources_dict,max_dist_pix,max_dist_channel):
     return found_sources_dict
 
 def local_background(x_coord,y_coord,integrated_image):
-    image_around_source = integrated_image[int(y_coord-bg_box_size/2):int(y_coord+bg_box_size/2),int(x_coord-bg_box_size/2):int(x_coord+bg_box_size/2)]
-    mean, median, std = sigma_clipped_stats(image_around_source[~np.isnan(image_around_source)],sigma=3)
+    
+    ypix_left, ypix_right = int(y_coord-(bg_box_size/2)), int(y_coord+(bg_box_size/2))
+    if ypix_left<0: ypix_left=0
+    if ypix_right>integrated_image.shape[0]: ypix_right = integrated_image.shape[0]-1
+        
+    xpix_left, xpix_right = int(x_coord-(bg_box_size/2)), int(x_coord+(bg_box_size/2))
+    if xpix_left<0: xpix_left=0
+    if xpix_right>integrated_image.shape[1]: xpix_right = integrated_image.shape[1]-1
+        
+    image_around_source = integrated_image[ypix_left:ypix_right,xpix_left:xpix_right]
+    try:mean, median, std = sigma_clipped_stats(image_around_source[~np.isnan(image_around_source)],sigma=3)
+    except: 
+        plt.imshow(image_around_source)
+        plt.show()
     return mean, std
 
 def check_local_background(x_coord,y_coord,max_value,integrated_image,integrated_image_beam_diameter):
@@ -396,6 +441,12 @@ def search_integrated_image(int_im_number, exclusion_zone_radius,median,popt_std
                   'failed_persistence':-99*np.ones(number_of_sources),'failed_spectral_SNR':-99*np.ones(number_of_sources),
                   'failed_spectral_fit':-99*np.ones(number_of_sources),
                   'associated_with':np.full(number_of_sources,'no_match_yet')})
+
+    # filter out sources too close to the edge of the cube
+    source_dict = source_dict[(source_dict['x_coord'].values>1.5*exclusion_zone_radius)&
+                              (source_dict['x_coord'].values<image_width-1.5*exclusion_zone_radius)&
+                              (source_dict['y_coord'].values>1.5*exclusion_zone_radius)&
+                              (source_dict['y_coord'].values<image_height-1.5*exclusion_zone_radius)]
         
     return source_dict
 
@@ -677,17 +728,17 @@ def source_finder_func(data_file, path_to_results,
         
     all_sources_dict=pd.read_csv(path_to_results_dir+'/found_sources_all.csv')
     all_sources_dict['redshift'] = (1420405751-all_sources_dict['frequency_Hz'].values)/all_sources_dict['frequency_Hz'].values
-    all_sources_dict['z_channel'] = int(all_sources_dict['gauss_x0'].values)
+    all_sources_dict['z_channel'] = np.array(all_sources_dict['gauss_x0'].values).astype(int)
     
     all_sources_dict = associate_sources_final(all_sources_dict,max_dist_pix,max_dist_channel)
-    all_sources_dict.to_csv(path_to_results_dir+'/found_sources_all.csv',index=False,columns=['ID','x_coord','y_coord','z_channel','RA_deg','Dec_deg','frequency_Hz','redshift','int_SNR','spectral_SNR','rsqr','gauss_x0','gauss_sigma','gauss_A','gauss_H','associated_with'])
+    all_sources_dict.to_csv(path_to_results_dir+'/found_sources_all.csv',index=False,columns=['ID','x_coord','y_coord','z_channel','RA_deg','Dec_deg','frequency_Hz','redshift','int_SNR','spectral_SNR','rsqr','gauss_x0','gauss_sigma','gauss_A','gauss_H','associated_with','int_im_channel'])
     
     filter_associated = (all_sources_dict['ID'].values==all_sources_dict['associated_with'].values)
     all_sources_dict = all_sources_dict[filter_associated]
     
     all_sources_dict = all_sources_dict.sort_values(by='spectral_SNR',ascending=False)
-    all_sources_dict.to_csv(path_to_results_dir+'/found_sources_associated.csv',index=False,columns=['ID','x_coord','y_coord','z_channel','RA_deg','Dec_deg','frequency_Hz','redshift','int_SNR','spectral_SNR','rsqr','gauss_x0','gauss_sigma','gauss_A','gauss_H'])
+    all_sources_dict.to_csv(path_to_results_dir+'/found_sources_associated.csv',index=False,columns=['ID','x_coord','y_coord','z_channel','RA_deg','Dec_deg','frequency_Hz','redshift','int_SNR','spectral_SNR','rsqr','gauss_x0','gauss_sigma','gauss_A','gauss_H','int_im_channel'])
     print('Found %s sources'%(len(all_sources_dict)))
-
+    all_sources_dict = pd.read_csv(path_to_results_dir+'/found_sources_associated.csv')
     return all_sources_dict
 

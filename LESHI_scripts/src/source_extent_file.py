@@ -1,6 +1,3 @@
-import warnings
-warnings.filterwarnings("ignore")
-
 import numpy as np
 import pandas as pd
 import cv2
@@ -23,6 +20,11 @@ from p_tqdm import p_map
 import multiprocessing
 
 from scipy.signal import argrelextrema
+import warnings
+
+# Convert RuntimeWarning into an exception
+warnings.filterwarnings("error", category=RuntimeWarning)
+
 
 def contour_sky_coord_in_deg_from_pix(contour,wcs):
     contour_sky = contour.copy()
@@ -81,23 +83,20 @@ def contour_to_mask(contour_points,shape):
 def moment_0_map(xpix,ypix,zchannel_left,zchannel_right,map_size,cube,cube_data,cube_channel_length):
     
     if zchannel_left<0:zchannel_left=0
-    if zchannel_right>cube_channel_length: zchannel_right = cube_channel_length-1
+    if zchannel_right>cube_channel_length: zchannel_right = -1
     zchannel_left, zchannel_right = int(zchannel_left), int(zchannel_right)
     
     ypix_left, ypix_right = int(ypix-(map_size/2)), int(ypix+(map_size/2))
     if ypix_left<0: ypix_left=0
-    if ypix_right>cube_data.shape[1]: ypix_right = cube_data.shape[1]-1
+    if ypix_right>cube_data.shape[1]: ypix_right = -1
         
     xpix_left, xpix_right = int(xpix-(map_size/2)), int(xpix+(map_size/2))
     if xpix_left<0: xpix_left=0
-    if xpix_right>cube_data.shape[2]: xpix_right = cube_data.shape[2]-1
+    if xpix_right>cube_data.shape[2]: xpix_right = -1
 
     cubelet=cube[zchannel_left:zchannel_right,ypix_left:ypix_right,xpix_left:xpix_right]
-
-    moment_0 = cubelet.moment(order=0) 
-    wcs_moment_0 = moment_0.wcs
-    moment_0 = moment_0.value
     
+    wcs_moment_0 = 0
     moment_0=np.nansum(np.array(cubelet.unmasked_data[:,:,:]),0)
     mean, median, std = sigma_clipped_stats(moment_0, sigma=3,maxiters=None)
     
@@ -111,7 +110,6 @@ def read_in_radio_file(radio_file):
     cube_data = cube.unmasked_data[:,:,:].value
     wcs_cube = cube.wcs
     cube_channel_length = cube_data.shape[0]
-    dpix = np.abs(wcs_cube.cdelt[0])*3600
     dpix=np.abs(wcs_cube.wcs.cdelt[0])*3600
     return cube, cube_data, wcs_cube, cube_channel_length,dpix
 
@@ -119,22 +117,22 @@ def read_in_radio_file(radio_file):
 def calculate_velocity_widths(x,xp, xe, a, w, b, c, C, yerr):
     x_cont = np.arange(np.nanmin(x),np.nanmax(x),0.1)
     model_cont = busy(x_cont, xp, xe, a, w, b, c, C)
-    try:
-        first_maximum, second_maximum, average_maximum = find_peaks_of_busy_function(x, xp, xe, a, w, b, c, C, yerr)
-        
-        half_signal_channels = x_cont[model_cont>=( (average_maximum-C)*0.5 + C )]
-        W50_channels = (half_signal_channels[-1]-half_signal_channels[0])+0.1
-        x0 = int((np.nanmin(half_signal_channels) + np.nanmax(half_signal_channels))/2)
+    
+    first_maximum, second_maximum, average_maximum = find_peaks_of_busy_function(x, xp, xe, a, w, b, c, C, yerr)
+    
+    half_signal_channels = x_cont[model_cont>=( (average_maximum-C)*0.5 + C )]
+    W50_channels = (half_signal_channels[-1]-half_signal_channels[0])+0.1
+    x0 = int((np.nanmin(half_signal_channels) + np.nanmax(half_signal_channels))/2)
 
-        if first_maximum>second_maximum:
-            signal_channels = x_cont[model_cont>( (first_maximum-C)*0.05 + C )]
-            W100_channels = (signal_channels[-1]-signal_channels[0])+0.1
-        else:
-            signal_channels = x_cont[model_cont>( (second_maximum-C)*0.05 + C )]
-            W100_channels = (signal_channels[-1]-signal_channels[0])+0.1
+    if first_maximum>second_maximum:
+        signal_channels = x_cont[model_cont>( (first_maximum-C)*0.05 + C )]
+        W100_channels = (signal_channels[-1]-signal_channels[0])+0.1
+    else:
+        signal_channels = x_cont[model_cont>( (second_maximum-C)*0.05 + C )]
+        W100_channels = (signal_channels[-1]-signal_channels[0])+0.1
             
-    except:
-        W50_channels, W100_channels, x0 = -99,-99,-99
+    
+    
    
     return W50_channels, W100_channels, x0
 
@@ -154,18 +152,20 @@ def find_peaks_of_busy_function(x, xp, xe, a, w, b, c, C, yerr):
     first_maximum = np.max(first_half)
     second_maximum = np.max(second_half)
 
-    
-    if first_maximum==np.max(y_cont):
-        if second_half[np.argmax(second_half)-1]==-99:
-            second_maximum = a*(c*np.abs( (xe+w-xp))**2  +1)+C
-            if first_maximum<second_maximum: second_maximum=first_maximum
-            if second_maximum<yerr: second_maximum=first_maximum
-            
-    if second_maximum==np.max(y_cont):
-        if first_half[np.argmax(first_half)+1]==-99:
-            first_maximum = a*(c*np.abs( (xe-w-xp))**2  +1)+C
-            if first_maximum>second_maximum: first_maximum=second_maximum
-            if first_maximum<yerr: first_maximum=second_maximum
+    if np.all(first_half==-99) or np.all(second_half==-99):
+        first_maximum, second_maximum, average_maximum = np.max(y_cont),np.max(y_cont),np.max(y_cont)
+    else:
+        if first_maximum==np.max(y_cont):
+            if second_half[np.argmax(second_half)-1]==-99:
+                second_maximum = a*(c*np.abs( (xe+w-xp))**2  +1)+C
+                if first_maximum<second_maximum: second_maximum=first_maximum
+                if second_maximum<yerr: second_maximum=first_maximum
+                
+        if second_maximum==np.max(y_cont):
+            if first_half[np.argmax(first_half)+1]==-99:
+                first_maximum = a*(c*np.abs( (xe-w-xp))**2  +1)+C
+                if first_maximum>second_maximum: first_maximum=second_maximum
+                if first_maximum<yerr: first_maximum=second_maximum
                 
     average_maximum = (first_maximum + second_maximum)/2
     return first_maximum, second_maximum, average_maximum
@@ -182,7 +182,7 @@ def log_likelihood_busy(theta, x, y, yerr):
 
 def log_prior_busy(x,theta):
     xp, xe, a, w, b, c, C = theta
-    if a>0 and  w>=3 and 100>b>=0 and c>=0:
+    if a>0 and w>=3 and 100>b>=0 and c>=0 and 0<xp<cube_channel_length-1 and 0<xe<cube_channel_length-1 :
         return 0.0
 
     return -np.inf
@@ -210,21 +210,28 @@ def busy(x, xp, xe, a, w, b, c, C):
 
 def fit_busy(x,y,source):
     # starting parameters
+    if source_data_table['fit_xp'].values[source]>cube_channel_length-2:
+        source_data_table['fit_xp'].values[source] = cube_channel_length-3
+    if source_data_table['fit_xe'].values[source]>cube_channel_length-2:
+        source_data_table['fit_xe'].values[source] = cube_channel_length-3
+        
     pos = [source_data_table['fit_xp'].values[source],source_data_table['fit_xe'].values[source],
            source_data_table['fit_a'].values[source], source_data_table['fit_w'].values[source],
            source_data_table['fit_b'].values[source],source_data_table['fit_c'].values[source],
-           source_data_table['fit_C'].values[source]]+1e-4 * np.random.randn(32, 7)
+           source_data_table['fit_C'].values[source]] +1e-4 * np.random.randn(32, 7)
     pos = np.abs(pos)
     nwalkers, ndim = pos.shape
-    
+    #print(pos)
     mean, median, yerr = sigma_clipped_stats(y, sigma=3,maxiters=None)
     #yerr=np.abs(np.max(y)-np.min(y))*0.01
     if yerr==0: yerr=0.0001
-        
-    sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability_busy, args=(x, y, yerr))
-    sampler.run_mcmc(pos, 2000, progress=False);
-    flat_samples = sampler.get_chain(discard=200, thin=10, flat=True)
+    try:
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability_busy, args=(x, y, yerr))
+        sampler.run_mcmc(pos, 2000, progress=False)
     
+        flat_samples = sampler.get_chain(discard=200, thin=10, flat=True)
+    except RuntimeWarning:
+        print(pos,cube_channel_length,source_data_table['fit_xp'].values[source])
 
     fit_xp = np.percentile(flat_samples[:, 0], [50])[0]
     fit_xe = np.percentile(flat_samples[:, 1], [50])[0]
@@ -247,7 +254,7 @@ def fit_busy(x,y,source):
 
 def fit_busy_velocity_width(x,y,source):
     # starting parameters
-    pos = [source_data_table['fit_xp'].values[source], source_data_table['fit_xe'].values[source],
+    pos = [source_data_table['fit_xp'].values[source]-1, source_data_table['fit_xe'].values[source]-1,
            source_data_table['fit_a'].values[source], source_data_table['fit_w'].values[source],
            source_data_table['fit_b'].values[source],source_data_table['fit_c'].values[source],
            source_data_table['fit_C'].values[source]]+1e-4 * np.random.randn(32, 7)
@@ -302,7 +309,7 @@ def find_source_extent(source_data_table_input):
     global source_data_table
     source_data_table = source_data_table_input
 
-    source_data_table['half_width'] = np.ones(len(source_data_table))*np.array(source_data_table['gauss_x0'].values)*2
+    source_data_table['half_width'] = np.ones(len(source_data_table))*np.array(source_data_table['gauss_sigma'].values)*2
     source_data_table['contour_flag'] = np.ones(len(source_data_table))
     source_data_table['contour_diameter_arc'] = np.ones(len(source_data_table))*beam_arc
     
@@ -310,12 +317,14 @@ def find_source_extent(source_data_table_input):
     source_data_table['W100'], source_data_table['W100_error'] = np.ones(len(source_data_table))*(-99), np.ones(len(source_data_table))*(-99)
     source_data_table['W50'], source_data_table['W50_error'] = np.ones(len(source_data_table))*(-99), np.ones(len(source_data_table))*(-99)
     
+    
 
     source_data_table['fit_xp'] = np.ones(len(source_data_table))*np.array(source_data_table['gauss_x0'].values)
     source_data_table['fit_xe'] = np.ones(len(source_data_table))*np.array(source_data_table['gauss_x0'].values) 
     source_data_table['fit_a'] = np.ones(len(source_data_table))
     source_data_table['fit_w']= np.ones(len(source_data_table))*10 
     source_data_table['fit_b'] = np.ones(len(source_data_table))*np.sqrt(np.pi/2)/np.array(source_data_table['gauss_sigma'].values)
+    source_data_table['fit_b'].values[source_data_table['fit_b'].values>=100]=99
     source_data_table['fit_c'] = np.ones(len(source_data_table))*1e-4*1.1
     source_data_table['fit_n'] = np.ones(len(source_data_table))*2
     source_data_table['fit_C'] = np.ones(len(source_data_table))*np.array(source_data_table['gauss_H'].values) 
@@ -324,7 +333,7 @@ def find_source_extent(source_data_table_input):
     for source in range(len(source_data_table)):
         # data coordinates
         x_pix, y_pix = source_data_table['x_coord'].values[source], source_data_table['y_coord'].values[source]
-        z_channel, sigma = source_data_table['gauss_x0'].values[source], int(source_data_table['gauss_sigma'].values[source])
+        z_channel, sigma = source_data_table['int_im_channel'].values[source], (source_data_table['gauss_sigma'].values[source])
         x_pix,y_pix,z_channel  = int(x_pix),int(y_pix),int(z_channel)
     
         wavelength_range_left, wavelength_range_right = z_channel-200, z_channel+200
@@ -338,7 +347,8 @@ def find_source_extent(source_data_table_input):
         contour_size = [-99,-99,-99,-99]
         x0=z_channel
         map_size_pix = initial_map_size_pix
-        half_width=2*sigma
+        half_width=int(2*sigma)
+        if half_width<1: half_width=1
         while True:
             
             # break the loop if the value does not converge after too many tries and keep initial values
@@ -408,13 +418,15 @@ def find_source_extent(source_data_table_input):
     
             # break the loop if the value converges
             if contour_size[-1]*0.95<len(mask[mask==True])<contour_size[-1]*1.05 and contour_size[-2]*0.95<len(mask[mask==True])<contour_size[-2]*1.05 and contour_size[-3]*0.95<len(mask[mask==True])<contour_size[-3]*1.05:
+                fail_flag=0
                 source_data_table['contour_flag'].values[source] = 0
                 break
             if contour_size[-2]*0.95<len(mask[mask==True])<contour_size[-2]*1.05 and contour_size[-4]*0.95<len(mask[mask==True])<contour_size[-4]*1.05:
+                fail_flag=0
                 source_data_table['contour_flag'].values[source] = 0
                 break
             contour_size.append(len(mask[mask==True]))
-            print(contour_size)
+            #print(contour_size)
             
             # update the size, center and range of the cubelet
             x_center_contour,y_center_contour = contour_center(source_contour)
@@ -428,8 +440,11 @@ def find_source_extent(source_data_table_input):
             if spectrum_half_length<200: spectrum_half_length=200
             wavelength_range_left, wavelength_range_right = x0-spectrum_half_length, x0+spectrum_half_length
             if wavelength_range_left<0: wavelength_range_left=2
-            if wavelength_range_right>= cube_data.shape[0] : wavelength_range_right = cube_data.shape[0] -2
+            if wavelength_range_right> cube_data.shape[0]-1 : wavelength_range_right = cube_data.shape[0] -1
             wavelength_range_array = np.arange(wavelength_range_left,wavelength_range_right,1,dtype=int)
+
+            if x0> cube_data.shape[0]-1: x0 = cube_data.shape[0]-1
+            if half_width<1: half_width=1
 
         if fail_flag==0:
 
@@ -446,49 +461,54 @@ def find_source_extent(source_data_table_input):
             source_data_table['W50'].values[source], source_data_table['W100'].values[source] = W50_channels, W100_channels
             source_data_table['W50_error'].values[source], source_data_table['W100_error'].values[source] = W50_channels_error, W100_channels_error
             source_data_table['frequency_Hz'].values[source],source_data_table['redshift'].values[source] = new_frequency, new_z
-            source_data_table['contour_diameter_arc'].values[source] = contour_diameter(source_contour)*np.abs(wcs_moment_0.wcs.cdelt[0])*3600
+            source_data_table['contour_diameter_arc'].values[source] = contour_diameter(source_contour)*dpix
 
             source_data_table['RA_deg'].values[source],source_data_table['Dec_deg'].values[source] = sky_coord_in_deg_from_pix(x_pix,y_pix,wcs_cube)
             source_data_table['x_coord'].values[source], source_data_table['y_coord'].values[source] = x_pix, y_pix
             source_data_table['z_channel'].values[source] = int(x0)
+            
         else:
-            source_data_table['fit_xp'] = np.ones(len(source_data_table))*(-99)
-            source_data_table['fit_xe'] = np.ones(len(source_data_table))*(-99)
-            source_data_table['fit_a'] = np.ones(len(source_data_table))*(-99)
-            source_data_table['fit_w'] = np.ones(len(source_data_table))*(-99)
-            source_data_table['fit_b'] = np.ones(len(source_data_table))*(-99)
-            source_data_table['fit_c'] = np.ones(len(source_data_table))*(-99)
-            source_data_table['fit_n'] = np.ones(len(source_data_table))*(-99)
-            source_data_table['fit_C'] = np.ones(len(source_data_table))*(-99)
+            source_data_table['fit_xp'].values[source] = (-99)
+            source_data_table['fit_xe'].values[source] = (-99)
+            source_data_table['fit_a'].values[source] = (-99)
+            source_data_table['fit_w'].values[source] = (-99)
+            source_data_table['fit_b'].values[source] = (-99)
+            source_data_table['fit_c'].values[source] = (-99)
+            source_data_table['fit_n'].values[source] = (-99)
+            source_data_table['fit_C'].values[source] = (-99)
 
-    source_data_table['half_width'].values[source_data_table['half_width'].values<3] = 3
+    source_data_table['half_width'].values[source_data_table['half_width'].values<1] = 1
     source_data_table['contour_diameter_arc'].values[source_data_table['contour_diameter_arc'].values<beam_arc] = beam_arc
     
     return source_data_table
 
 def associate_sources_final(found_sources_dict):
+    found_sources_dict['associated_with'] = np.full(len(found_sources_dict),'no_match_yet')
     for source in range(len(found_sources_dict)):
         dist = np.sqrt( (found_sources_dict['x_coord'].values[source] - found_sources_dict['x_coord'].values)**2 +
                         (found_sources_dict['y_coord'].values[source] - found_sources_dict['y_coord'].values)**2)
         dist_channel = np.absolute(found_sources_dict['x0_busy'].values[source]-found_sources_dict['x0_busy'].values)
-        match_id = np.arange(0,len(found_sources_dict))[(dist<found_sources_dict['contour_diameter_arc'].values[source]/3*dpix)&(dist_channel<=found_sources_dict['half_width'].values)]
+        match_id = np.arange(0,len(found_sources_dict))[(dist<found_sources_dict['contour_diameter_arc'].values[source]/3*dpix)&(dist_channel<=found_sources_dict['half_width'].values[source])]
         found_sources_dict['associated_with'].values[source] = found_sources_dict['ID'].values[match_id[np.argmax(found_sources_dict['int_SNR'].values[match_id])]]     
     return found_sources_dict
 
-def source_extent_script(data_table, path_to_radio_file, initial_map_size_pix_input, beam_arc):
-    global cube, cube_data, wcs_cube, cube_channel_length, initial_map_size_pix, beam_pix, dpix
+def source_extent_script(data_table, path_to_radio_file, initial_map_size_pix_input, beam_arc_input):
+    global cube, cube_data, wcs_cube, cube_channel_length, initial_map_size_pix, beam_arc, dpix
     initial_map_size_pix = initial_map_size_pix_input
     cube, cube_data, wcs_cube, cube_channel_length, dpix=read_in_radio_file(path_to_radio_file)
-
-    core_number = multiprocessing.cpu_count()
-    n_sources = len(data_table)
-    core_number = n_sources
+    beam_arc = beam_arc_input
+    # core_number = multiprocessing.cpu_count()
+    # n_sources = len(data_table)
+    # core_number = n_sources
     source_extent_results = p_map(find_source_extent,
-                                      [data_table[i:(i+1)] for i in range(core_number)])
-    data_table = pd.concat(source_extent_results)
-
-    data_table.to_csv('found_sources_extent.csv',index='False')
+                                      [data_table[i:(i+1)] for i in range(len(data_table))])
+    all_sources_dict = pd.concat(source_extent_results)
+    all_sources_dict = associate_sources_final(all_sources_dict)
+    filter_associated = (all_sources_dict['ID'].values==all_sources_dict['associated_with'].values)
+    all_sources_dict = all_sources_dict[filter_associated]
     
-    return data_table
+    all_sources_dict.to_csv('found_sources_extent.csv',index=False)
+    
+    return all_sources_dict
 
     
