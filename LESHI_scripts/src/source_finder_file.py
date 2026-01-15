@@ -678,7 +678,8 @@ def source_finder_func(data_file, path_to_results,
         print('checking %s sources in frequency space using %s cores'%(len(all_sources_dict[filter_passed ]),core_number))
         spectral_check_results = p_map(check_source_in_spectral,
                                       [all_sources_dict[filter_passed][i*int((n_sources)/core_number+1):(i+1)*int((n_sources)/core_number+1)] for i in range(core_number)])
-        all_sources_dict = pd.concat([all_sources_dict[~filter_passed],pd.concat(spectral_check_results)])
+        
+        if len(spectral_check_results)>0: all_sources_dict = pd.concat([all_sources_dict[~filter_passed],pd.concat(spectral_check_results)])
     
         # associate passing sources in neighbouring slabs
         filter_passed = (np.array(all_sources_dict['failed_spectral_SNR'])==0)
@@ -686,15 +687,15 @@ def source_finder_func(data_file, path_to_results,
         print('associating %s sources in overlapping frequency slabs'%(n_sources))  
         associated_sources_results = p_map(associate_sources,
                                       [all_sources_dict[filter_passed][i*int((n_sources)/core_number+1):(i+1)*int((n_sources)/core_number+1)] for i in range(core_number)])
-        all_sources_dict = pd.concat([all_sources_dict[~filter_passed],pd.concat(associated_sources_results)])
-    
+        if len(associated_sources_results)>0: all_sources_dict = pd.concat([all_sources_dict[~filter_passed],pd.concat(associated_sources_results)])
+        
         # check source by fitting gaussian function
         filter_passed_associated = (np.array(all_sources_dict['failed_spectral_SNR'])==0)&(all_sources_dict['ID'].values==all_sources_dict['associated_with'].values)
         n_sources = len(all_sources_dict[filter_passed_associated])
         print('fitting Gaussian function for %s sources using %s cores'%(n_sources,core_number))  
         gaussian_fit_check_results = p_map(check_source_gaussian_fit,
                                       [all_sources_dict[filter_passed_associated][i:(i+1)] for i in range(len(all_sources_dict[filter_passed_associated]))])
-        all_sources_dict = pd.concat([all_sources_dict[~filter_passed_associated],pd.concat(gaussian_fit_check_results)])
+        if len(gaussian_fit_check_results)>0: all_sources_dict = pd.concat([all_sources_dict[~filter_passed_associated],pd.concat(gaussian_fit_check_results)])
         
         # get sky coordinates and frequency for each source
         ra_array,dec_array = sky_coord_in_deg_from_pix(all_sources_dict['x_coord'].values,all_sources_dict['y_coord'].values,data_cube_wcs)
