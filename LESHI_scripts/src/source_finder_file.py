@@ -693,7 +693,7 @@ def source_finder_func(data_file, path_to_results,
         n_sources = len(all_sources_dict[filter_passed_associated])
         print('fitting Gaussian function for %s sources using %s cores'%(n_sources,core_number))  
         gaussian_fit_check_results = p_map(check_source_gaussian_fit,
-                                      [all_sources_dict[filter_passed_associated][i*int((n_sources)/core_number+1):(i+1)*int((n_sources)/core_number+1)] for i in range(core_number)])
+                                      [all_sources_dict[filter_passed_associated][i:(i+1)] for i in range(len(all_sources_dict[filter_passed_associated]))])
         all_sources_dict = pd.concat([all_sources_dict[~filter_passed_associated],pd.concat(gaussian_fit_check_results)])
         
         # get sky coordinates and frequency for each source
