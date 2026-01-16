@@ -90,12 +90,12 @@ def fit_gauss(x,y):
     for i in range(5):
         if 6*fit_sigma[0]<20:
             left_border = np.linspace(0,x0_id -20,5)[i] 
-            right_border = np.linspace(x0_id +20,x0_id,5)[i]
+            right_border = np.linspace(x0_id +20,len(x)-1,5)[i]
         else:
             left_border = np.linspace(0,int(x0_id -6*fit_sigma[0]),5)[i] 
-            right_border = np.linspace(int(x0_id +6*fit_sigma[0]),x0_id,5)[i] 
-        left_border[left_border<0]=0
-        right_border[right_border>=len(x)]=len(x)-1
+            right_border = np.linspace(int(x0_id +6*fit_sigma[0]),len(x)-1,5)[i] 
+        if left_border<0: left_border=0
+        if right_border>=len(x): right_border=len(x)-1
         y_central = y[int(left_border):int(right_border)]
         x_central = x[int(left_border):int(right_border)]
     
