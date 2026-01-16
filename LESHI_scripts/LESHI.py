@@ -170,3 +170,8 @@ def source_extent(data_table, data_cube, min_window_width_pix=100, beam_diam_arc
     df = source_extent_file.source_extent_script(data_table, data_cube, min_window_width_pix, beam_diam_arc)
     return df
 
+def emission_plot(data_table, path_to_data_cube, path_to_optical_images='./optical_images/', path_to_results='./',
+                   image_arc_width=100,spectrum_length=200,beam=None,filetype='png'):
+    from .src import emission_plot_file
+    emission_plot_file.emission_plot_script(data_table,path_to_data_cube,path_to_optical_images,path_to_results,image_arc_width,spectrum_length,beam,filetype)
+
