@@ -89,8 +89,8 @@ def fit_gauss(x,y):
     x0_id = np.where(x==int(fit_x0[0]))
     for i in range(5):
         if 6*fit_sigma[0]<20:
-            left_border = np.linspace(0,x0_id -20),5)[i] 
-            right_border = np.linspace(x0_id +20,x0_id),5)[i]
+            left_border = np.linspace(0,x0_id -20,5)[i] 
+            right_border = np.linspace(x0_id +20,x0_id,5)[i]
         else:
             left_border = np.linspace(0,int(x0_id -6*fit_sigma[0]),5)[i] 
             right_border = np.linspace(int(x0_id +6*fit_sigma[0]),x0_id,5)[i] 
