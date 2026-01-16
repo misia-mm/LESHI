@@ -86,7 +86,7 @@ def fit_gauss(x,y):
     fit_sigma = np.percentile(flat_samples[:, 3], [50])
 
     rsqr_array = np.ones(5)
-    x0_id = np.where(x==int(fit_x0[0]))
+    x0_id = np.where(x==int(fit_x0[0]))[0][0]
     for i in range(5):
         if 6*fit_sigma[0]<20:
             left_border = np.linspace(0,x0_id -20,5)[i] 
