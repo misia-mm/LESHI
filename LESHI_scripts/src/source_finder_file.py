@@ -16,7 +16,6 @@ from spectral_cube import SpectralCube
 
 import matplotlib
 from matplotlib.colors import Normalize
-import matplotlib.pyplot as plt
 
 from photutils.detection import find_peaks
 from photutils.aperture import CircularAperture, RectangularAperture, CircularAnnulus, ApertureStats, EllipticalAnnulus
@@ -53,7 +52,7 @@ def log_likelihood(theta, x, y, yerr):
 
 def log_prior(theta):
     H, A, x0, sigma = theta
-    if 0.0 <= A and 0 <= x0 <= cube_channel_range and sigma>0:
+    if 0.0 <= A and 0 <= x0 <= cube_channel_range and cube_channel_range>sigma>signal_persistence_threshold/4:
         return 0.0
     return -np.inf
 
@@ -67,7 +66,7 @@ def gauss(x, H, A, x0, sigma):
             return H + A * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
     
 def fit_gauss(x,y):
-    H_0, A_0, x0_0, sigma_0 = 0,np.abs(np.nanmax(y)),x[np.nanargmax(y)],int_image_length/2
+    H_0, A_0, x0_0, sigma_0 = 0,np.abs(np.nanmax(y)),x[np.nanargmax(y)],int_image_length/6
     if x0_0==0: x0_0=1
     if x0_0==cube_channel_range: x0_0=cube_channel_range-1
     pos = [H_0, A_0, x0_0, sigma_0] + 1e-5 * np.random.randn(32, 4)
@@ -86,24 +85,36 @@ def fit_gauss(x,y):
     fit_sigma = np.percentile(flat_samples[:, 3], [50])
 
     rsqr_array = np.ones(5)
-    x0_id = np.where(x==int(fit_x0[0]))[0][0]
+    if int(fit_x0[0])<x[0]: x0_id=0
+    elif int(fit_x0[0])>x[-1]: x0_id=len(x)-1
+    else:x0_id = np.where(x==int(fit_x0[0]))[0][0]
+        
+    
     for i in range(5):
-        if 6*fit_sigma[0]<20:
-            left_border = np.linspace(0,x0_id -20,5)[i] 
-            right_border = np.linspace(x0_id +20,len(x)-1,5)[i]
+        if 6*fit_sigma[0]<30:
+            left_border = np.linspace(0,x0_id -30,5)[i] 
+            right_border = np.linspace(len(x)-1,x0_id +30,5)[i]
         else:
             left_border = np.linspace(0,int(x0_id -6*fit_sigma[0]),5)[i] 
-            right_border = np.linspace(int(x0_id +6*fit_sigma[0]),len(x)-1,5)[i] 
+            right_border = np.linspace(len(x)-1,int(x0_id +6*fit_sigma[0]),5)[i] 
         if left_border<0: left_border=0
         if right_border>=len(x): right_border=len(x)-1
         y_central = y[int(left_border):int(right_border)]
         x_central = x[int(left_border):int(right_border)]
     
-        fit_y = gauss(x_central, fit_H, fit_A, fit_x0, fit_sigma) 
+        fit_y = gauss(x_central, fit_H[0], fit_A[0], fit_x0[0], fit_sigma[0]) 
 
-        rsqr_array[i] = 1- (np.nansum((y_central-fit_y)**2))/(np.nansum((y_central-np.nansum(y_central)/len(y_central))**2))
+        if np.nansum((y_central-np.nansum(y_central)/len(y_central))**2)!=0: 
+            mean_y = fit_H[0]
+            rsqr_array[i] = 1- (np.nansum((y_central-fit_y)**2))/(np.nansum((y_central-mean_y)**2))
+        else: rsqr_array[i] = 0
+    rsqr = np.nanmax(rsqr_array)
+    
+    # fit_y = gauss(x, fit_H[0], fit_A[0], fit_x0[0], fit_sigma[0]) 
+    # mean_y = fit_H[0]
+    #rsqr = 1- (np.nansum((y-fit_y)**2))/(np.nansum((y-mean_y)**2))
         
-    rsqr = np.max(rsqr_array)
+    
     return rsqr, fit_x0[0], fit_sigma[0], fit_A[0], fit_H[0]
 
 def check_source_gaussian_fit(found_sources_dict):
@@ -124,6 +135,11 @@ def check_source_gaussian_fit(found_sources_dict):
             if flux_cubelet_end>cube_end: flux_cubelet_end=cube_end
             flux = get_beam_spectrum(x_coord,y_coord,integrated_image_beam_diameter,flux_cubelet_start,flux_cubelet_end)
             
+            sloped_continuum = True
+            if sloped_continuum:
+                x = np.arange(0,len(flux))
+                z = np.polyfit(x,flux,1)
+                flux = flux - (z[1]+x*z[0])
             channels=np.arange(flux_cubelet_start,flux_cubelet_end,1)
             
             # check spectrum
@@ -174,6 +190,7 @@ def get_beam_spectrum(x_coord,y_coord,integrated_image_beam_diameter,flux_cubele
     for channel in range(len(flux)):
         (flux_cubelet[channel])[distance>radius] = np.nan
         flux[channel] = np.nansum(flux_cubelet[channel])
+        
     return flux
     
 def find_sequence(arr,seq):
@@ -227,9 +244,10 @@ def check_persistence(x_coord,y_coord,integrated_image_beam_diameter,integrated_
             (channel_frame_around_max_value)[distance_from_max>int(integrated_image_beam_diameter/2)] = np.nan
             beam_area = len(channel_frame_around_max_value[~np.isnan(channel_frame_around_max_value)])
             
-            # check if values within beam around the max value are bigger than half of threshold SNR
-            if len(channel_frame_around_max_value[channel_frame_around_max_value>0.5*frame_threshold])>=beam_area-1:
-                signal_in_channel[channel] = True
+            # check if values within beam around the max value are bigger than half of threshold SNR with some tolerance
+            if len(channel_frame_around_max_value[channel_frame_around_max_value<0.5*frame_threshold])>np.ceil(beam_area*0.1):
+                signal_in_channel[channel] = False
+            else: signal_in_channel[channel] = True
 
                 
     consecutive_signal = find_sequence(signal_in_channel,np.full(signal_persistence_threshold,True))
@@ -266,6 +284,12 @@ def check_source_in_spectral(found_sources_dict):
             channels = np.arange(flux_cubelet_start_full,flux_cubelet_end_full)
             flux_full = get_beam_spectrum(x_coord,y_coord,integrated_image_beam_diameter,flux_cubelet_start_full,flux_cubelet_end_full)
 
+            sloped_continuum = True
+            if sloped_continuum:
+                x = np.arange(0,len(flux_full))
+                z = np.polyfit(x,flux_full,1)
+                flux_full = flux_full - (z[1]+x*z[0])
+        
             # get spectrum for beam pixels around source
             flux_cubelet_start_central = integrated_image_central_channel-int(3/2*round(int_image_length))
             flux_cubelet_end_central = integrated_image_central_channel+int(3/2*round(int_image_length))
@@ -276,7 +300,7 @@ def check_source_in_spectral(found_sources_dict):
             flux_long = np.append( flux_full[(channels>=flux_cubelet_start_full)&(channels<flux_cubelet_start_central)],
                                    flux_full[(channels>=flux_cubelet_end_central)&(channels<flux_cubelet_end_full)])
             
-            half_width = int(8.5*round(int_image_length))
+            half_width = int(7.5*round(int_image_length))
             if half_width<50: half_width = 50
             flux_cubelet_start_medium = integrated_image_central_channel-half_width
             flux_cubelet_end_medium = integrated_image_central_channel+half_width
@@ -285,18 +309,19 @@ def check_source_in_spectral(found_sources_dict):
             flux_medium = np.append( flux_full[(channels>=flux_cubelet_start_medium)&(channels<flux_cubelet_start_central)],
                                    flux_full[(channels>=flux_cubelet_end_central)&(channels<flux_cubelet_end_medium)])
             
-            spectral_SNR, spectral_SNR_average = calculate_spectral_SNR(flux_long,flux_central)
-            spectral_SNR, spectral_SNR_average_2 = calculate_spectral_SNR(flux_medium,flux_central)
-            
+            spectral_SNR_1, spectral_SNR_average_1 = calculate_spectral_SNR(flux_long,flux_central)
+            spectral_SNR_2, spectral_SNR_average_2 = calculate_spectral_SNR(flux_medium,flux_central)
+            spectral_SNR = np.max([spectral_SNR_1,spectral_SNR_2])
             found_sources_dict['spectral_SNR'].values[source] = spectral_SNR
-            if (spectral_SNR>SNR_spectrum_threshold and spectral_SNR_average_2>0.95*SNR_spectrum_threshold) or (spectral_SNR>SNR_spectrum_threshold and spectral_SNR_average>0.95*SNR_spectrum_threshold):
+            
+            if (spectral_SNR>SNR_spectrum_threshold and spectral_SNR_average_2>0.9*SNR_spectrum_threshold) or (spectral_SNR>SNR_spectrum_threshold and spectral_SNR_average_1>0.9*SNR_spectrum_threshold):
+            # if (spectral_SNR>SNR_spectrum_threshold and spectral_SNR_average>0.9*SNR_spectrum_threshold):
                 found_sources_dict['failed_spectral_SNR'].values[source] = 0
                 
             else:
                 found_sources_dict['failed_spectral_SNR'].values[source] = 1
                 
             break
-    
     return found_sources_dict
     
 def associate_sources(found_sources_dict):
@@ -331,10 +356,8 @@ def local_background(x_coord,y_coord,integrated_image):
     if xpix_right>integrated_image.shape[1]: xpix_right = integrated_image.shape[1]-1
         
     image_around_source = integrated_image[ypix_left:ypix_right,xpix_left:xpix_right]
-    try:mean, median, std = sigma_clipped_stats(image_around_source[~np.isnan(image_around_source)],sigma=3)
-    except: 
-        plt.imshow(image_around_source)
-        plt.show()
+    mean, median, std = sigma_clipped_stats(image_around_source[~np.isnan(image_around_source)],sigma=3)
+
     return mean, std
 
 def check_local_background(x_coord,y_coord,max_value,integrated_image,integrated_image_beam_diameter):
@@ -364,7 +387,7 @@ def check_beamsize(x_coord,y_coord,integrated_image,integrated_image_beam_diamet
     image_around_source[distance>radius] = np.nan
     
     image_around_source = image_around_source[~np.isnan(image_around_source)]
-    return len(image_around_source[image_around_source>local_threshold*0.5])>=len(image_around_source)
+    return len(image_around_source[image_around_source>local_threshold*0.5])>=len(image_around_source)*0.9
 
 def check_source_on_integrated_image(found_sources_dict):
 
@@ -419,7 +442,6 @@ def search_integrated_image(int_im_number, exclusion_zone_radius,median,popt_std
     initial_SNR = (found_peaks_max_value-median)/exp_function(radiuses,*popt_std)
 
     # filter out sources below threshold
-    plt.scatter(found_peaks_x_coord_array[above_threshold_mask],found_peaks_y_coord_array[above_threshold_mask],c=radiuses[above_threshold_mask], cmap='Spectral')
     found_peaks_x_coord_array = found_peaks_x_coord_array[above_threshold_mask]
     found_peaks_y_coord_array = found_peaks_y_coord_array[above_threshold_mask]
     found_peaks_max_value = found_peaks_max_value[above_threshold_mask]
@@ -720,6 +742,7 @@ def source_finder_func(data_file, path_to_results,
         print('Found %s sources'%(len(all_sources_dict)))
         
         del spectral_check_results
+        del gaussian_fit_check_results
         del all_sources_dict
         gc.collect()
         
