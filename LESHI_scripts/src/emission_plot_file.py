@@ -13,6 +13,9 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
 from matplotlib.patches import Ellipse
 
+import emcee
+from scipy import special
+
 from astropy.io import fits 
 from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord
@@ -96,7 +99,7 @@ def moment_0_map(xpix,ypix,zchannel_left,zchannel_right,map_size,cube,cube_data,
 
     cubelet=cube[zchannel_left:zchannel_right,ypix_left:ypix_right,xpix_left:xpix_right]
 
-    cubelet.beam_threshold = [100]
+    cubelet.beam_threshold = [10000]
     moment_0 = cubelet.moment(order=0) 
     wcs_moment_0 = moment_0.wcs
     moment_0 = moment_0.value
@@ -112,13 +115,14 @@ def ini_plot(x_pix_coord,y_pix_coord,ra,dec,source_ID):
     #prepare the figure and its layout
     fig = plt.figure(figsize=(8,8*11.5/10))
     gs = fig.add_gridspec(5,11, hspace=0, wspace=0,height_ratios = [2,1,5,0.01,3],width_ratios = [1,1,1,1,1,0.1,1,1,1,1,1])
-    axs = gs.subplots(sharex=True, sharey=True)
+    
+    axs = gs.subplots(sharex=True, sharey=True)        
 
     for ax in axs[0, 0:11]:
         ax.remove()
     axcoordinfo = fig.add_subplot(gs[0, 0:3])
-    axspecfitinfo = fig.add_subplot(gs[0, 3:6])
-    axflaginfo = fig.add_subplot(gs[0, 6:11])
+    axspecfitinfo = fig.add_subplot(gs[0, 3:8])
+    axflaginfo = fig.add_subplot(gs[0, 8:11])
 
     for ax in axs[1, 0:]:
         ax.remove() 
@@ -219,7 +223,69 @@ def ini_plot(x_pix_coord,y_pix_coord,ra,dec,source_ID):
     ra_axis.set_axislabel_position('t')
 
     return fig, axs, axflaginfo, axspecfitinfo, axcoordinfo, axradioimage, axvisimage, axspectrumwide
+    
+# functions for fitting busy function to the spectrum
+def log_likelihood_busy(theta, x, y, yerr):
+    xp, xe, a, w, b, c, C = theta
+    model = busy(x, xp, xe, a, w, b, c, C)
+    sigma2 = yerr**2
+    
+    return -0.5 * np.sum((y - model) ** 2 / sigma2 + np.log(sigma2))
 
+def log_prior_busy(x,theta):
+    xp, xe, a, w, b, c, C = theta
+    if a>0 and w>=3 and 5>b>=0 and c>=0 and 0<xp<cube_channel_range-1 and 0<xe<cube_channel_range-1 :
+        return 0.0
+
+    return -np.inf
+
+def log_probability_busy(theta, x, y, yerr):
+    lp = log_prior_busy(x,theta)
+    if not np.isfinite(lp):
+        return -np.inf
+    return lp + log_likelihood_busy(theta, x, y, yerr)
+    
+def busy(x, xp, xe, a, w, b, c, C):
+    xp, xe, a, w, b, c, C = round(xp,13), round(xe,13), round(a,13), round(w,13), round(b,13), round(c,13), round(C,13)
+    return a/4*( special.erf(b*(w+x-xe)) +1) * ( special.erf(b*(w-x+xe)) +1 )*(c*(np.abs(x-xp))**2 + 1)+C
+
+def fit_busy(x,y,source,sources_dict):
+    # starting parameters
+    if sources_dict['fit_xp'].values[source]>cube_channel_range-2:
+        sources_dict['fit_xp'].values[source] = cube_channel_range-3
+    if sources_dict['fit_xe'].values[source]>cube_channel_range-2:
+        sources_dict['fit_xe'].values[source] = cube_channel_range-3
+        
+    pos = [sources_dict['fit_xp'].values[source],sources_dict['fit_xe'].values[source],
+           sources_dict['fit_a'].values[source], sources_dict['fit_w'].values[source],
+           sources_dict['fit_b'].values[source],sources_dict['fit_c'].values[source],
+           sources_dict['fit_C'].values[source]] +1e-4 * np.random.randn(32, 7)
+    pos = np.abs(pos)
+    nwalkers, ndim = pos.shape
+    #print(pos)
+    mean, median, yerr = sigma_clipped_stats(y, sigma=3,maxiters=None)
+    #yerr=np.abs(np.max(y)-np.min(y))*0.01
+    yerr=0.0001
+    if yerr==0: yerr=0.0001
+    try:
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability_busy, args=(x, y, yerr))
+        sampler.run_mcmc(pos, 7000, progress=False)
+    
+        flat_samples = sampler.get_chain(discard=200, thin=10, flat=True)
+    except RuntimeWarning:
+        print(pos,cube_channel_length,sources_dict['fit_xp'].values[source])
+
+    fit_xp = np.percentile(flat_samples[:, 0], [50])[0]
+    fit_xe = np.percentile(flat_samples[:, 1], [50])[0]
+    fit_a = np.percentile(flat_samples[:, 2], [50])[0]
+    fit_w = np.percentile(flat_samples[:, 3], [50])[0]
+    fit_b = np.percentile(flat_samples[:, 4], [50])[0]
+    fit_c = np.percentile(flat_samples[:, 5], [50])[0]
+    fit_C = np.percentile(flat_samples[:, 6], [50])[0]
+    
+    fit_y =busy(x, fit_xp, fit_xe, fit_a, fit_w, fit_b, fit_c, fit_C)
+    return fit_y, fit_xp, fit_xe, fit_a, fit_w, fit_b, fit_c, fit_C
+    
 def get_beam_spectrum(x_coord,y_coord,beam_diameter,flux_cubelet_start,flux_cubelet_end):
     if flux_cubelet_start<0: flux_cubelet_start=0
     if flux_cubelet_end>cube_channel_range: flux_cubelet_end=cube_channel_range
@@ -245,6 +311,7 @@ def channel_to_frequency(channel,wcs):
     wave0,wavedelta,channel0 = wcs.wcs.crval[2],wcs.wcs.cdelt[2],wcs.wcs.crpix[2]
     frequency = wave0+wavedelta*(channel-channel0)
     return frequency
+    
     
 def wide_spectrum_plot(axspectrumwide,wavelength_range_array_wide,x_coord,y_coord,beam_diameter,sources_dict,source,bmpix,contour_mask,map_size_pix,cube_data):
     cube_data = data_cube.unmasked_data[:,:,:]
@@ -282,11 +349,25 @@ def wide_spectrum_plot(axspectrumwide,wavelength_range_array_wide,x_coord,y_coor
   
     #axspectrumwide.step(xdata,ydata,color = 'black',alpha=0.45,lw=0.7)
     axspectrumwide.step(xdata,ydata,color = 'black',alpha=0.5,lw=0.75,label='spectrum')
+    busy_fit, fit_xp, fit_xe, fit_a, fit_w, fit_b, fit_c, fit_C = fit_busy(wavelength_range_array_wide,ydata/(bmpix*dfreq),source,sources_dict)
+    
     
     xdata = np.arange(wavelength_range_array_wide[0],wavelength_range_array_wide[-1]+1,0.2)
+    busy_func = busy(xdata,fit_xp, fit_xe, fit_a, fit_w, fit_b, fit_c, fit_C)*bmpix*dfreq
+    xdata = channel_to_frequency(xdata,data_cube_wcs)/1E6
+    axspectrumwide.plot(xdata,busy_func,color='blue',label='busy function',lw=0.75,alpha=0.9)
     #axspectrumwide.plot(channel_to_frequency(xdata,data_cube_wcs)/1E6,bmpix*dfreq*gauss(xdata,sources_dict['H'].values[source],sources_dict['A'].values[source],sources_dict['x0'].values[source],sources_dict['sigma'].values[source],),color='blue',label='Gaussian function fit',lw=0.75,alpha=0.9)
-    
-    axspectrumwide.axvline(channel_to_frequency(sources_dict['x0_busy'].values[source],data_cube_wcs)/1E6,color='gray',ls='--',alpha=0.2,lw=1)
+    z_channel = sources_dict['x0_busy'].values[source]
+
+    try:
+        axspectrumwide.axvline(  1420.406/(sources_dict['z_spec'].values+1),color='gray',ls='--',alpha=0.2,lw=1,label='z$_{opt}$')
+    except:
+        pass
+        
+    axspectrumwide.axvline(channel_to_frequency(z_channel+sources_dict['W50'].values[source]/2-0.5,data_cube_wcs)/1E6,color='gray',
+                           ls='--',alpha=0.6,lw=1)
+    axspectrumwide.axvline(channel_to_frequency(z_channel-sources_dict['W50'].values[source]/2+0.5,data_cube_wcs)/1E6,
+                           color='gray',ls='--',alpha=0.6,lw=1,label=r'$W_{50}$')
     axspectrumwide.legend(loc='upper right')
     
     return ydata 
@@ -436,9 +517,10 @@ def info_about_target(source_dict,source,axflaginfo, axspecfitinfo, axcoordinfo,
     # coordinates
     
     axcoordinfo.text(0.03,0.9,'DETECTION COORDINATES')
-    axcoordinfo.text(0.03,0.75,'xpix ypix channel: '+str(source_dict['x_coord'].values[source])+' '+str(source_dict['y_coord'].values[source])+' '+str(round(source_dict['z_channel'].values[source])))
     sky_coords = SkyCoord(source_dict['RA_deg'].values[source],source_dict['Dec_deg'].values[source], frame="fk5", unit="deg")
-
+    x_pix_coord, y_pix_coord = skycoord_to_pixel(sky_coords,data_cube_wcs)
+    axcoordinfo.text(0.03,0.75,'xpix ypix channel: '+str(int(x_pix_coord))+' '+str(int(y_pix_coord))+' '+str(round(source_dict['z_channel'].values[source])))
+    
     if sky_coords.dec.dms.d<0: zero_non_zero = '-'
     else: zero_non_zero='+'
     hex_coords = str(int(sky_coords.ra.hms.h)).zfill(2)+'h'+str(int(sky_coords.ra.hms.m)).zfill(2)+'m'+str(round(sky_coords.ra.hms.s,1)).zfill(4)+'s '+zero_non_zero+str(int(abs(sky_coords.dec.dms.d))).zfill(2)+'d'+str(int(abs(sky_coords.dec.dms.m))).zfill(2)+'m'+str(int(round(abs(sky_coords.dec.dms.s)))).zfill(2)+'s'
@@ -451,23 +533,28 @@ def info_about_target(source_dict,source,axflaginfo, axspecfitinfo, axcoordinfo,
     
     axcoordinfo.text(0.03,0.30,  'redshift:   HI: '+str(round(redshifthi,3))+'  OH: '+str(round(redshiftoh,3)))
     axcoordinfo.text(0.03,0.05,  'beam diameter: '+str(round(beam_diameter,2))+' arcsec')
+
     
     # spectral fitting
-    # axspecfitinfo.text(0.03,0.9,'SNR AND GAUSSIAN FIT')
-
-    # axspecfitinfo.text(0.03,0.75,r'SNR$_{intim}$ = '+str(round(source_dict['int_SNR'].values[source],3)))
-    # axspecfitinfo.text(0.03,0.65,r'SNR$_{spectral}$ = '+str(round(source_dict['spectral_SNR'].values[source],3)))
-    # axspecfitinfo.text(0.03,0.55,r'R$^{2}$ = '+str(round(source_dict['rsqr'].values[source],3)))
-
-    # axspecfitinfo.text(0.03,0.40,r'x$_{0}$ = '+str(round(source_dict['x0'].values[source],3)))
-    # axspecfitinfo.text(0.03,0.30,'σ = '+str(round(source_dict['sigma'].values[source],3)))
-    # axspecfitinfo.text(0.03,0.20,'A = '+str(round(source_dict['A'].values[source],3)))
-    # axspecfitinfo.text(0.03,0.10,'H = '+str(round(source_dict['H'].values[source],3)))
-
+    axspecfitinfo.text(0.03,0.9,'HI EMISSION')
     
+    axspecfitinfo.text(0.03,0.75,r'log(M$_{HI}$/M$_{☉}$) = %s ± %s'%(str(round(source_dict['MHI_prism'].values[source],3)),str(round((source_dict['MHI_prism_error']).values[source],3))))
+    axspecfitinfo.text(0.03,0.65, r'F$_{tot}$ [Jy Hz] = %s ± %s'%(str(round((source_dict['flux_Jy_Hz']).values[source],3)),str(round((source_dict['flux_Jy_Hz_error']).values[source],3))))
+    axspecfitinfo.text(0.03,0.55, r'SNR$_{3D}$ = '+str(round((source_dict['integrated_SNR']).values[source],3)))
+    if (source_dict['confidence_flag']).values[source]==0 and (source_dict['confused_flag']).values[source]==1: axspecfitinfo.text(0.03,0.05, 'confident detection, confused source')
+    elif (source_dict['confidence_flag']).values[source]==1 and (source_dict['blended_flag']).values[source]==0: axspecfitinfo.text(0.03,0.05, 'not confident detection, single source')
+    elif (source_dict['confidence_flag']).values[source]==1 and (source_dict['blended_flag']).values[source]==1: axspecfitinfo.text(0.03,0.05, 'not confident detection, blended source')
+    elif (source_dict['confidence_flag']).values[source]==0 and (source_dict['blended_flag']).values[source]==0: axspecfitinfo.text(0.03,0.05, 'confident detection, single source')
+    elif (source_dict['confidence_flag']).values[source]==0 and (source_dict['blended_flag']).values[source]==1: axspecfitinfo.text(0.03,0.05, 'confident detection, blended source')
     
-    # axflaginfo.text(0.03,0.9,'CROSSMATCH')
-
+    axflaginfo.text(0.03,0.9,'HI SPECTRAL PROFILE')
+    dv = dfreq/source_dict['frequency_Hz'].values[source]*300000
+    axflaginfo.text(0.03,0.75,r'W$_{50}$ [km/s] = '+str(round((source_dict['W50']).values[source]*dv,3))+'±'+str(round((source_dict['W50_error']).values[source]*dv,3)))
+    axflaginfo.text(0.03,0.65,r'W$_{50}$ [channels] = '+str(round((source_dict['W50']).values[source],2)) +'±'+str(round((source_dict['W50_error']).values[source],2)) )
+    axflaginfo.text(0.03,0.55,r'W$_{100}$ [km/s] = '+str(round((source_dict['W100']).values[source]*dv,3))+'±'+str(round((source_dict['W100_error']).values[source]*(source_dict['dv']).values[source],3))) 
+    axflaginfo.text(0.03,0.45,r'W$_{100}$ [channels] = '+str(round((source_dict['W100']).values[source],2))+'±'+str(round((source_dict['W100_error']).values[source],2)) )
+    axflaginfo.text(0.03,0.35,r'Δv$_{channel}$ [km/s] = '+str(round(dv,1)) )
+    
 
 def read_in_radio_file(radio_file):
     
@@ -498,8 +585,11 @@ def make_plot(sources_dict):
         #print('source: ',source,' out of ',len(sources_dict))
         # data coordinates
         ra, dec = (sources_dict['RA_deg'].values)[source], (sources_dict['Dec_deg'].values)[source]
+        sky_coords =SkyCoord(ra, dec, unit="deg",frame="fk5")
+        x_pix_coord, y_pix_coord = skycoord_to_pixel(sky_coords,data_cube_wcs)
         z_channel, sigma =  (sources_dict['x0_busy'].values)[source], ((sources_dict['half_width'].values)[source])/2
         if (sources_dict['x0_busy'].values)[source]==-99: z_channel = (sources_dict['gauss_x0'].values)[source]
+        x_pix_coord,y_pix_coord,z_channel  = int(x_pix_coord),int(y_pix_coord),int(z_channel)
         
         image_pixel_width = int(sources_dict['contour_diameter_arc'].values[source]*2/dpix)
         if sources_dict['contour_diameter_arc'].values[source]>200:image_pixel_width = int(sources_dict['contour_diameter_arc'].values[source]*1.1/dpix)
@@ -508,10 +598,6 @@ def make_plot(sources_dict):
         
         spectrum_length = sources_dict['half_width'].values[source]*2*6
         if spectrum_length<spectrum_length_min: spectrum_length = spectrum_length_min
-       
-        sky_coords =SkyCoord(ra, dec, unit="deg",frame="fk5")
-        x_pix_coord, y_pix_coord = (sources_dict['x_coord'].values)[source], (sources_dict['y_coord'].values)[source]
-        x_pix_coord,y_pix_coord,z_channel  = int(x_pix_coord),int(y_pix_coord),int(z_channel)
         
         
 
@@ -581,7 +667,8 @@ def make_plot(sources_dict):
                 axvisimage.add_patch(beam_contour)
                 
             else:
-                axradioimage.contour(moment_0_masked, contour_levels, colors='white',transform=axradioimage.get_transform(wcs_moment_0),linewidths=0.8, alpha=0.9 )
+                axradioimage.contour(moment_0_masked, contour_levels[1:], colors='white',transform=axradioimage.get_transform(wcs_moment_0),linewidths=0.8, alpha=0.9 )
+                axradioimage.contour(moment_0_masked, [contour_levels[0]], colors='white',transform=axradioimage.get_transform(wcs_moment_0),linewidths=0.8, alpha=0.9,linestyles='--' )
                 axvisimage.contour(moment_0_masked, contour_levels, colors='white',transform=axvisimage.get_transform(wcs_moment_0),linewidths=0.8, alpha=0.5 )
                 
         except:
@@ -606,7 +693,7 @@ def make_plot(sources_dict):
         flux = wide_spectrum_plot(axspectrumwide,wavelength_range_array,x_pix_coord,y_pix_coord,beam_diameter_pixel,sources_dict,source,bmpix,contour_mask,image_pixel_width,data_cube)
         
     
-        axspecfitinfo.set_title('                        '+sources_dict['ID'].values[source],fontsize=12)
+        axspecfitinfo.set_title(sources_dict['ID'].values[source],fontsize=12)
         
             
         #out_file = path_to_results_dir+sources_dict['ID'].values[source]+'.pdf'
