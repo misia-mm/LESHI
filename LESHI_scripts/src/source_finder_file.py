@@ -286,8 +286,11 @@ def check_source_in_spectral(found_sources_dict):
 
             sloped_continuum = True
             if sloped_continuum:
-                x = np.arange(0,len(flux_full))
-                z = np.polyfit(x,flux_full,1)
+                flux_full_mean_center = copy.deepcopy(flux_full)
+                flux_full_mean_center[int(len(flux_full)/2-int_image_length*3):int(len(flux_full)/2+int_image_length*3)] = np.median(flux_full)
+
+                x = np.arange(0,len(flux_full_mean_center))
+                z = np.polyfit(x,flux_full_mean_center,1)
                 flux_full = flux_full - (z[1]+x*z[0])
         
             # get spectrum for beam pixels around source
