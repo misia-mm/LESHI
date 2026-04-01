@@ -214,6 +214,12 @@ def check_persistence(x_coord,y_coord,integrated_image_beam_diameter,integrated_
     image_around_source = np.array(data_cube.unmasked_data[integrated_image_central_channel,
                                    ypix_left:ypix_right,
                                    xpix_left:xpix_right],dtype=np.float32)
+    channel = integrated_image_central_channel
+    while len(image_around_source[~np.isnan(image_around_source)])==0:
+        channel = channel-1
+        image_around_source = np.array(data_cube.unmasked_data[channel,
+                                   ypix_left:ypix_right,
+                                   xpix_left:xpix_right],dtype=np.float32)
     mean, median, std = sigma_clipped_stats(image_around_source[~np.isnan(image_around_source)],sigma=3)
     frame_threshold = median+std*SNR_channel_frame_threshold
 
