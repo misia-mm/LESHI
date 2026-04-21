@@ -1,11 +1,13 @@
 
-def source_finder(data_cube, path_to_results,
+def source_finder(data_cube, path_to_results = "./",
                        SNR_integ=3.5, SNR_channel=2.5, 
                        channel_min_len=3,
                        SNR_spec=3.5, rsqr_min=0.35,
                        int_image_len=10, int_image_load_no=10,
                        channel_start=0, channel_end=None, beam=None, 
-                       bg_box_size=100, max_dist_pix=10, max_dist_channel=10, test_hist=False ):
+                       bg_box_size=100, sloped_continuum = False,
+                       max_dist_pix=10, max_dist_channel=10, 
+                       core_no=None, test_hist=False ):
     """Start the LESHI Source Finder. 
     
     Parameters
@@ -14,59 +16,64 @@ def source_finder(data_cube, path_to_results,
         Path to the datacube to perform source finding on.
 
     path_to_results : str
-        Path to the directory where the results will be saved.
+        Path to the directory where the results will be saved (default = "./").
 
     SNR_integ : int or float
-        Threshold signal-to-noise ratio of each source on the integrated image (default = 3.5)
+        Threshold signal-to-noise ratio of each source on the integrated image (default = 3.5).
 
     SNR_channel : int or float
-        Threshold signal-to-noise ratio of each source on the channel image (default = 2.5)
+        Threshold signal-to-noise ratio of each source on the channel image (default = 2.5).
 
     channel_min_len : int
-        Minimum number of channels that the signal persists for (default = 3)
+        Minimum number of channels that the signal persists for (default = 3).
 
     SNR_spec : int or float
-        Threshold signal-to-noise ratio of each source on the spectrum (default = 3.5)
+        Threshold signal-to-noise ratio of each source on the spectrum (default = 3.5).
 
     rsqr_min : int or float
         Minimum value of the R^2 parameter (ranging from 0 to 1) quantifying how well the fitted Gaussian
-        function fits the spectrum (default = 0.35)
+        function fits the spectrum (default = 0.35).
 
     int_image_len : even int
         Channel width of the cube slab to integrate into a moment-0 map. Has to be an even number. 
-        Should be equal to the width of the weakest expected signals in channels (default = 10)
+        Should be equal to the width of the weakest expected signals in channels (default = 10).
     
     int_image_load_no : int
-        Number of  moment-0 maps (integarted images) to process at the same time, limited by the available RAM (default = 10)
+        Number of  moment-0 maps (integarted images) to process at the same time, limited by the available RAM (default = 10).
 
     channel_start : int
-        Channel of the data cube where source finding should start (default = 0)
+        Channel of the data cube where source finding should start (default = 0).
 
     channel_end : int
         Channel of the data cube where source finding should end, if None, the source finding will end 
-        at the end of the data cube (default = None)
+        at the end of the data cube (default = None).
 
     beam : int or float
         Diameter of the synthesised beam of the data cube in pixels, only needed if this information cannot
         be read from the data by SpectralCube package (defulat = None).
 
     bg_box_size : int
-        Width of the box in pixels used to calculate local background noise (default = 100)
+        Width of the box in pixels used to calculate local background noise (default = 100).
+
+    sloped_continuum : bool
+        If set to True, the code will attempt to level the spectrum of the checked source to properly 
+        determine its spectral SNR (default = False).
 
     max_dist_pix : int
-        Maximal distance in pixels between two sources to be associated into one source (defualt = 10)
+        Maximal distance in pixels between two sources to be associated into one source (defualt = 10).
 
     max_dist_channel : int
-        Maximal distance in channels between two sources to be associated into one source (defualt = 10)
+        Maximal distance in channels between two sources to be associated into one source (defualt = 10).
 
     test_hist : bool
-        Whether to output the full testing history or not, showing where each source failed or passed, useful for troubleshooting
-        (defualt = False)
+        Whether to output the full testing history or not, showing where each source failed or passed, useful for troubleshooting, 
+        however may result in very large tables (defualt = False).
+
+    core_no : int
+        Number of cores to use for parallelisation 
     
     Returns
     ------
-    output : none
-        Function does not return anything, all results are saved in the specified csv file.
     output : pandas data frame
         Function returns the data table with found associated sources, the table is also saved in the specified directory.
     """
@@ -102,7 +109,7 @@ def source_finder(data_cube, path_to_results,
                        SNR_spec, rsqr_min,
                        int_image_len,int_image_load_no,
                        channel_start,channel_end,beam,test_hist, 
-                       bg_box_size,max_dist_pix,max_dist_channel )
+                       bg_box_size,max_dist_pix,max_dist_channel,sloped_continuum,core_no )
         return df
     else:
         print('int_image_len should be an even number')
