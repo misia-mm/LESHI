@@ -24,7 +24,6 @@ import warnings
 # Convert RuntimeWarning into an exception
 warnings.filterwarnings("error", category=RuntimeWarning)
 
-
 def contour_sky_coord_in_deg_from_pix(contour,wcs):
     contour_sky = contour.copy()
     for row in range(contour.shape[0]):
@@ -498,6 +497,30 @@ def find_source_extent(source_data_table_input):
             source_data_table['RA_deg'].values[source],source_data_table['Dec_deg'].values[source] = sky_coord_in_deg_from_pix(x_pix,y_pix,wcs_cube)
             source_data_table['x_coord'].values[source], source_data_table['y_coord'].values[source] = x_pix, y_pix
             source_data_table['z_channel'].values[source] = int(x0)
+
+            if ~os.path.exists(path_to_results+'/contours'):
+                os.makedirs(path_to_results+'/contours')
+            contour_sky = contour_sky_coord_in_deg_from_pix(source_contour,wcs_cube)
+            with open(path_to_results+'/contours/'+"%s_contour.data"%(source_data_table['ID'].values[source]), 'wb') as f:
+                pickle.dump(contour_sky, f)
+                
+            if ~os.path.exists(path_to_results+'/extent_quick_plots'):
+                os.makedirs(path_to_results+'/extent_quick_plots')
+            fig = plt.figure(figsize=(15,5))
+            gs = fig.add_gridspec(2,1, hspace=0, wspace=0,width_ratios = [1,2])
+            ax = gs.subplots()
+            ax[0].imshow(moment_0)
+            ax[0].plot(source_contour.T[0],source_contour.T[1],c='white',ls='--')
+            ax.[1].step(wavelength_range_array,flux,c='k',alpha=0.6,label='spectrum')
+            ax[1].plot(wavelength_range_array,fit_y,c='blue',label='busy fit')
+            ax[1].set_xlabel('channels [pix]')
+            ax[1].set_ylabel('Flux')
+            ax[1].axvline(  x0,color='gray',ls='--',alpha=0.4,lw=1,label='center')
+            ax[1].axvline(  x0-W50_channels,color='gray',ls='--',alpha=0.2,lw=1,label='W50')
+            ax[1].axvline(  x0+W50_channels,color='gray',ls='--',alpha=0.2,lw=1)
+            ax[1].legend(loc='upper right')
+            fig.savefig(path_to_results+'/extent_quick_plots/'+"%s_plot.jpg"%(source_data_table['ID'].values[source])
+                
             
         else:
             source_data_table['fit_xp'].values[source] = (-99)
@@ -524,8 +547,8 @@ def associate_sources_final(found_sources_dict):
         found_sources_dict['associated_with'].values[source] = found_sources_dict['ID'].values[match_id[np.argmax(found_sources_dict['z_channel'].values[match_id])]]     
     return found_sources_dict
 
-def source_extent_script(data_table, path_to_radio_file, initial_map_size_pix_input, beam_arc_input):
-    global cube, cube_data, wcs_cube, cube_channel_length, initial_map_size_pix, beam_arc, dpix
+def source_extent_script(data_table, path_to_radio_file, initial_map_size_pix_input, beam_arc_input,path_to_results):
+    global cube, cube_data, wcs_cube, cube_channel_length, initial_map_size_pix, beam_arc, dpix, path_to_results
     initial_map_size_pix = initial_map_size_pix_input
     cube, cube_data, wcs_cube, cube_channel_length, dpix=read_in_radio_file(path_to_radio_file)
     beam_arc = beam_arc_input
@@ -536,8 +559,8 @@ def source_extent_script(data_table, path_to_radio_file, initial_map_size_pix_in
                                       [data_table[i:(i+1)] for i in range(len(data_table))])
     all_sources_dict = pd.concat(source_extent_results)
     all_sources_dict = associate_sources_final(all_sources_dict)
-    filter_associated = (all_sources_dict['ID'].values==all_sources_dict['associated_with'].values)
-    all_sources_dict = all_sources_dict[filter_associated]
+    #filter_associated = (all_sources_dict['ID'].values==all_sources_dict['associated_with'].values)
+    #all_sources_dict = all_sources_dict[filter_associated]
     
     all_sources_dict.to_csv('found_sources_extent.csv',index=False)
     
