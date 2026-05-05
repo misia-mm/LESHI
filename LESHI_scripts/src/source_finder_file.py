@@ -135,8 +135,8 @@ def check_source_gaussian_fit(found_sources_dict):
             if flux_cubelet_end>cube_end: flux_cubelet_end=cube_end
             flux = get_beam_spectrum(x_coord,y_coord,integrated_image_beam_diameter,flux_cubelet_start,flux_cubelet_end)
             
-            sloped_continuum = True
-            if sloped_continuum:
+            
+            if sloped_baseline:
                 x = np.arange(0,len(flux))
                 z = np.polyfit(x,flux,1)
                 flux = flux - (z[1]+x*z[0])
@@ -290,8 +290,8 @@ def check_source_in_spectral(found_sources_dict):
             channels = np.arange(flux_cubelet_start_full,flux_cubelet_end_full)
             flux_full = get_beam_spectrum(x_coord,y_coord,integrated_image_beam_diameter,flux_cubelet_start_full,flux_cubelet_end_full)
 
-            sloped_continuum = True
-            if sloped_continuum:
+            
+            if sloped_baseline:
                 flux_cubelet_start_mean_center = integrated_image_central_channel-int(3*round(int_image_length))
                 flux_cubelet_end_mean_center = integrated_image_central_channel+int(3*round(int_image_length))
                 if flux_cubelet_start_mean_center<cube_start: flux_cubelet_start_mean_center=cube_start
@@ -570,7 +570,8 @@ def source_finder_func(data_file, path_to_results,
                        SNR_spectrum_threshold_input, rsqr_threshold_input,
                        int_image_length_input,int_image_load_number_input,
                        cube_start_input,cube_end_input,beam,output_test_history,
-                       bg_box_size_input,max_dist_pix_input,max_dist_channel_input ):
+                       bg_box_size_input,max_dist_pix_input,max_dist_channel_input,
+                       sloped_baseline,core_no ):
 
     
     global  SNR_integrated_image_threshold, SNR_channel_frame_threshold, signal_persistence_threshold,\
@@ -581,7 +582,7 @@ def source_finder_func(data_file, path_to_results,
             integrated_image_beam_diameter_array, integrated_image_central_channel_array,\
             cube_slab_number, slab_half_length,\
             integrated_image_list, int_popt_std_list, int_median_list, chunk,\
-            max_dist_pix,max_dist_channel
+            max_dist_pix,max_dist_channel, sloped_baseline 
 
 
     SNR_integrated_image_threshold, SNR_channel_frame_threshold, signal_persistence_threshold = SNR_integrated_image_threshold_input, SNR_channel_frame_threshold_input, signal_persistence_threshold_input
@@ -591,8 +592,8 @@ def source_finder_func(data_file, path_to_results,
     bg_box_size = bg_box_size_input
     max_dist_pix,max_dist_channel = max_dist_pix_input,max_dist_channel_input
     
-    core_number = multiprocessing.cpu_count()
-    
+    if core_number == None: core_number = multiprocessing.cpu_count()
+    else: core_number = core_no
     # get cube data
     data_cube = SpectralCube.read(data_file)
     # wcs
@@ -688,7 +689,7 @@ def source_finder_func(data_file, path_to_results,
         # find sources
         print('finding sources')
         exclusion_zone_radius = integrated_image_beam_diameter_array[np.arange(int_im_start,int_im_end)]
-        searching_results = p_map(search_integrated_image, np.arange(0,len(exclusion_zone_radius)), exclusion_zone_radius,int_median_list,int_popt_std_list)
+        searching_results = p_map(search_integrated_image, np.arange(0,len(exclusion_zone_radius)), exclusion_zone_radius,int_median_list,int_popt_std_list,num_cpus=core_number)
      
         all_sources_dict = pd.concat(searching_results)
         n_sources = len(all_sources_dict)
@@ -698,7 +699,7 @@ def source_finder_func(data_file, path_to_results,
         
     
         integrated_image_check_results = p_map(check_source_on_integrated_image,
-                                               [all_sources_dict[i*int((n_sources)/core_number+1):(i+1)*int((n_sources)/core_number+1)] for i in range(core_number)])
+                                               [all_sources_dict[i*int((n_sources)/core_number+1):(i+1)*int((n_sources)/core_number+1)] for i in range(core_number)],num_cpus=core_number)
         
         all_sources_dict = pd.concat(integrated_image_check_results)
         
@@ -713,7 +714,7 @@ def source_finder_func(data_file, path_to_results,
         n_sources = len(all_sources_dict[filter_passed])
         print('checking %s sources in frequency space using %s cores'%(len(all_sources_dict[filter_passed ]),core_number))
         spectral_check_results = p_map(check_source_in_spectral,
-                                      [all_sources_dict[filter_passed][i*int((n_sources)/core_number+1):(i+1)*int((n_sources)/core_number+1)] for i in range(core_number)])
+                                      [all_sources_dict[filter_passed][i*int((n_sources)/core_number+1):(i+1)*int((n_sources)/core_number+1)] for i in range(core_number)],num_cpus=core_number)
         
         if len(spectral_check_results)>0: all_sources_dict = pd.concat([all_sources_dict[~filter_passed],pd.concat(spectral_check_results)])
     
@@ -722,7 +723,7 @@ def source_finder_func(data_file, path_to_results,
         n_sources = len(all_sources_dict[filter_passed])
         print('associating %s sources in overlapping frequency slabs'%(n_sources))  
         associated_sources_results = p_map(associate_sources,
-                                      [all_sources_dict[filter_passed][i*int((n_sources)/core_number+1):(i+1)*int((n_sources)/core_number+1)] for i in range(core_number)])
+                                      [all_sources_dict[filter_passed][i*int((n_sources)/core_number+1):(i+1)*int((n_sources)/core_number+1)] for i in range(core_number)],num_cpus=core_number)
         if len(associated_sources_results)>0: all_sources_dict = pd.concat([all_sources_dict[~filter_passed],pd.concat(associated_sources_results)])
         
         # check source by fitting gaussian function
@@ -730,7 +731,7 @@ def source_finder_func(data_file, path_to_results,
         n_sources = len(all_sources_dict[filter_passed_associated])
         print('fitting Gaussian function for %s sources using %s cores'%(n_sources,core_number))  
         gaussian_fit_check_results = p_map(check_source_gaussian_fit,
-                                      [all_sources_dict[filter_passed_associated][i:(i+1)] for i in range(len(all_sources_dict[filter_passed_associated]))])
+                                      [all_sources_dict[filter_passed_associated][i:(i+1)] for i in range(len(all_sources_dict[filter_passed_associated]))],num_cpus=core_number)
         if len(gaussian_fit_check_results)>0: all_sources_dict = pd.concat([all_sources_dict[~filter_passed_associated],pd.concat(gaussian_fit_check_results)])
         
         # get sky coordinates and frequency for each source
