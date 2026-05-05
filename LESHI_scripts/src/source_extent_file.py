@@ -319,7 +319,7 @@ def find_source_extent(source_data_table_input):
             a,b,c = source_data_table['gauss_sigma'].values, source_data_table['gauss_x0'].values, source_data_table['gauss_H'].values 
         except:
             source_data_table['gauss_sigma'] = np.ones(len(source_data_table))*5
-            source_data_table['gauss_x0'] = np.ones(len(source_data_table))*frequency_to_channel(source_data_table['frequency_Hz'].values[source],wcs_cube)
+            source_data_table['gauss_x0'] = np.ones(len(source_data_table))*frequency_to_channel(source_data_table['frequency_Hz'].values,wcs_cube)
             source_data_table['gauss_H'] = np.ones(len(source_data_table))*0
             
         source_data_table['half_width'] = np.ones(len(source_data_table))*np.array(source_data_table['gauss_sigma'].values)*2
