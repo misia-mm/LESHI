@@ -511,7 +511,7 @@ def find_source_extent(source_data_table_input):
             ax = gs.subplots()
             ax[0].imshow(moment_0)
             ax[0].plot(source_contour.T[0],source_contour.T[1],c='white',ls='--')
-            ax.[1].step(wavelength_range_array,flux,c='k',alpha=0.6,label='spectrum')
+            ax[1].step(wavelength_range_array,flux,c='k',alpha=0.6,label='spectrum')
             ax[1].plot(wavelength_range_array,fit_y,c='blue',label='busy fit')
             ax[1].set_xlabel('channels [pix]')
             ax[1].set_ylabel('Flux')
@@ -519,7 +519,7 @@ def find_source_extent(source_data_table_input):
             ax[1].axvline(  x0-W50_channels,color='gray',ls='--',alpha=0.2,lw=1,label='W50')
             ax[1].axvline(  x0+W50_channels,color='gray',ls='--',alpha=0.2,lw=1)
             ax[1].legend(loc='upper right')
-            fig.savefig(path_to_results+'/extent_quick_plots/'+"%s_plot.jpg"%(source_data_table['ID'].values[source])
+            fig.savefig(path_to_results+'/extent_quick_plots/'+"%s_plot.jpg"%(source_data_table['ID'].values[source]))
                 
             
         else:
@@ -547,9 +547,10 @@ def associate_sources_final(found_sources_dict):
         found_sources_dict['associated_with'].values[source] = found_sources_dict['ID'].values[match_id[np.argmax(found_sources_dict['z_channel'].values[match_id])]]     
     return found_sources_dict
 
-def source_extent_script(data_table, path_to_radio_file, initial_map_size_pix_input, beam_arc_input,path_to_results):
+def source_extent_script(data_table, path_to_radio_file, initial_map_size_pix_input, beam_arc_input,path_to_results_input):
     global cube, cube_data, wcs_cube, cube_channel_length, initial_map_size_pix, beam_arc, dpix, path_to_results
     initial_map_size_pix = initial_map_size_pix_input
+    path_to_results = path_to_results_input
     cube, cube_data, wcs_cube, cube_channel_length, dpix=read_in_radio_file(path_to_radio_file)
     beam_arc = beam_arc_input
     # core_number = multiprocessing.cpu_count()
