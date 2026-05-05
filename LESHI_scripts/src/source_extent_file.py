@@ -510,7 +510,7 @@ def find_source_extent(source_data_table_input):
             if not os.path.exists(path_to_results+'/extent_quick_plots'):
                 os.makedirs(path_to_results+'/extent_quick_plots')
             fig = plt.figure(figsize=(15,5))
-            gs = fig.add_gridspec(2,1, hspace=0, wspace=0,width_ratios = [1,2])
+            gs = fig.add_gridspec(1,2, hspace=0, wspace=0,width_ratios = [1,2])
             ax = gs.subplots()
             ax[0].imshow(moment_0)
             ax[0].plot(source_contour.T[0],source_contour.T[1],c='white',ls='--')
