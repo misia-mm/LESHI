@@ -311,25 +311,36 @@ def find_source_extent(source_data_table_input):
     global source_data_table
     source_data_table = source_data_table_input
 
-    source_data_table['half_width'] = np.ones(len(source_data_table))*np.array(source_data_table['gauss_sigma'].values)*2
-    source_data_table['contour_flag'] = np.ones(len(source_data_table))
-    source_data_table['contour_diameter_arc'] = np.ones(len(source_data_table))*beam_arc
+    try:
+        a = source_data_table['x0_busy'].values
+        
+    except:
+        try:
+            a,b,c = source_data_table['gauss_sigma'].values, source_data_table['gauss_x0'].values, source_data_table['gauss_H'].values 
+        except:
+            source_data_table['gauss_sigma'] = np.ones(len(source_data_table))*5
+            source_data_table['gauss_x0'] = np.ones(len(source_data_table))*frequency_to_channel(source_data_table['frequency_Hz'].values[source],wcs_cube)
+            source_data_table['gauss_H'] = np.ones(len(source_data_table))*0
+            
+        source_data_table['half_width'] = np.ones(len(source_data_table))*np.array(source_data_table['gauss_sigma'].values)*2
+        source_data_table['contour_flag'] = np.ones(len(source_data_table))
+        source_data_table['contour_diameter_arc'] = np.ones(len(source_data_table))*beam_arc
+        
+        source_data_table['x0_busy'], source_data_table['x0_busy_error'] = np.ones(len(source_data_table))*(-99), np.ones(len(source_data_table))*(-99)
+        source_data_table['W100'], source_data_table['W100_error'] = np.ones(len(source_data_table))*(-99), np.ones(len(source_data_table))*(-99)
+        source_data_table['W50'], source_data_table['W50_error'] = np.ones(len(source_data_table))*(-99), np.ones(len(source_data_table))*(-99)
+        
+        
     
-    source_data_table['x0_busy'], source_data_table['x0_busy_error'] = np.ones(len(source_data_table))*(-99), np.ones(len(source_data_table))*(-99)
-    source_data_table['W100'], source_data_table['W100_error'] = np.ones(len(source_data_table))*(-99), np.ones(len(source_data_table))*(-99)
-    source_data_table['W50'], source_data_table['W50_error'] = np.ones(len(source_data_table))*(-99), np.ones(len(source_data_table))*(-99)
-    
-    
-
-    source_data_table['fit_xp'] = np.ones(len(source_data_table))*np.array(source_data_table['gauss_x0'].values)
-    source_data_table['fit_xe'] = np.ones(len(source_data_table))*np.array(source_data_table['gauss_x0'].values) 
-    source_data_table['fit_a'] = np.ones(len(source_data_table))
-    source_data_table['fit_w']= np.ones(len(source_data_table))*10 
-    source_data_table['fit_b'] = np.ones(len(source_data_table))*np.sqrt(np.pi/2)/np.array(source_data_table['gauss_sigma'].values)
-    source_data_table['fit_b'].values[source_data_table['fit_b'].values>=100]=99
-    source_data_table['fit_c'] = np.ones(len(source_data_table))*1e-4*1.1
-    source_data_table['fit_n'] = np.ones(len(source_data_table))*2
-    source_data_table['fit_C'] = np.ones(len(source_data_table))*np.array(source_data_table['gauss_H'].values) 
+        source_data_table['fit_xp'] = np.ones(len(source_data_table))*np.array(source_data_table['gauss_x0'].values)
+        source_data_table['fit_xe'] = np.ones(len(source_data_table))*np.array(source_data_table['gauss_x0'].values) 
+        source_data_table['fit_a'] = np.ones(len(source_data_table))
+        source_data_table['fit_w']= np.ones(len(source_data_table))*10 
+        source_data_table['fit_b'] = np.ones(len(source_data_table))*np.sqrt(np.pi/2)/np.array(source_data_table['gauss_sigma'].values)
+        source_data_table['fit_b'].values[source_data_table['fit_b'].values>=100]=99
+        source_data_table['fit_c'] = np.ones(len(source_data_table))*1e-4*1.1
+        source_data_table['fit_n'] = np.ones(len(source_data_table))*2
+        source_data_table['fit_C'] = np.ones(len(source_data_table))*np.array(source_data_table['gauss_H'].values) 
     
 
     for source in range(len(source_data_table)):
