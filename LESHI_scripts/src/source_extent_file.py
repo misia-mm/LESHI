@@ -41,7 +41,7 @@ def sky_coord_in_deg_from_pix(x_pix_coord,y_pix_coord,wcs):
 def frequency_to_channel(frequency,wcs):
     wave0,wavedelta,channel0 = wcs.wcs.crval[2],wcs.wcs.cdelt[2],wcs.wcs.crpix[2]
     channel = (frequency-wave0)/wavedelta+channel0
-    return frequency
+    return channel
     
 def channel_to_frequency(channel,wcs):
     wave0,wavedelta,channel0 = wcs.wcs.crval[2],wcs.wcs.cdelt[2],wcs.wcs.crpix[2]
