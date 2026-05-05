@@ -521,7 +521,7 @@ def associate_sources_final(found_sources_dict):
                         (found_sources_dict['y_coord'].values[source] - found_sources_dict['y_coord'].values)**2)
         dist_channel = np.absolute(found_sources_dict['x0_busy'].values[source]-found_sources_dict['x0_busy'].values)
         match_id = np.arange(0,len(found_sources_dict))[(dist<found_sources_dict['contour_diameter_arc'].values[source]/3*dpix)&(dist_channel<=found_sources_dict['half_width'].values[source])]
-        found_sources_dict['associated_with'].values[source] = found_sources_dict['ID'].values[match_id[np.argmax(found_sources_dict['int_SNR'].values[match_id])]]     
+        found_sources_dict['associated_with'].values[source] = found_sources_dict['ID'].values[match_id[np.argmax(found_sources_dict['z_channel'].values[match_id])]]     
     return found_sources_dict
 
 def source_extent_script(data_table, path_to_radio_file, initial_map_size_pix_input, beam_arc_input):
