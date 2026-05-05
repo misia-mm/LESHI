@@ -171,10 +171,10 @@ def detection_plot(data_table, path_to_data_cube, path_to_optical_images, path_t
     detection_plot_file.detection_plot_func(image_arc_width,spectrum_length,beam,
                         path_to_optical_images,path_to_results,data_table,path_to_data_cube)
     
-def source_extent(data_table, data_cube, min_window_width_pix=100, beam_diam_arc=7):
+def source_extent(data_table, data_cube, min_window_width_pix=100, beam_diam_arc=7,path_to_results='./'):
     from .src import source_extent_file
     
-    df = source_extent_file.source_extent_script(data_table, data_cube, min_window_width_pix, beam_diam_arc)
+    df = source_extent_file.source_extent_script(data_table, data_cube, min_window_width_pix, beam_diam_arc,path_to_results)
     return df
 
 def emission_plot(data_table, path_to_data_cube, path_to_optical_images='./optical_images/', path_to_results='./',
