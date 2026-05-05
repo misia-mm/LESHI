@@ -571,7 +571,7 @@ def source_finder_func(data_file, path_to_results,
                        int_image_length_input,int_image_load_number_input,
                        cube_start_input,cube_end_input,beam,output_test_history,
                        bg_box_size_input,max_dist_pix_input,max_dist_channel_input,
-                       sloped_baseline,core_no ):
+                       sloped_baseline_input,core_no_input ):
 
     
     global  SNR_integrated_image_threshold, SNR_channel_frame_threshold, signal_persistence_threshold,\
@@ -591,9 +591,10 @@ def source_finder_func(data_file, path_to_results,
     cube_start, cube_end = cube_start_input, cube_end_input
     bg_box_size = bg_box_size_input
     max_dist_pix,max_dist_channel = max_dist_pix_input,max_dist_channel_input
-    
-    if core_number == None: core_number = multiprocessing.cpu_count()
-    else: core_number = core_no
+    sloped_baseline = sloped_baseline_input
+
+    if core_no_input == None: core_number = multiprocessing.cpu_count()
+    else: core_number = core_no_input
     # get cube data
     data_cube = SpectralCube.read(data_file)
     # wcs
