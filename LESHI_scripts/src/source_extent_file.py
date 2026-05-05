@@ -501,13 +501,13 @@ def find_source_extent(source_data_table_input):
             source_data_table['x_coord'].values[source], source_data_table['y_coord'].values[source] = x_pix, y_pix
             source_data_table['z_channel'].values[source] = int(x0)
 
-            if ~os.path.exists(path_to_results+'/contours'):
-                os.makedirs(path_to_results+'/contours')
+            if not os.path.exists(path_to_results+'contours'):
+                os.makedirs(path_to_results+'contours')
             contour_sky = contour_sky_coord_in_deg_from_pix(source_contour,wcs_cube)
             with open(path_to_results+'/contours/'+"%s_contour.data"%(source_data_table['ID'].values[source]), 'wb') as f:
                 pickle.dump(contour_sky, f)
                 
-            if ~os.path.exists(path_to_results+'/extent_quick_plots'):
+            if not os.path.exists(path_to_results+'/extent_quick_plots'):
                 os.makedirs(path_to_results+'/extent_quick_plots')
             fig = plt.figure(figsize=(15,5))
             gs = fig.add_gridspec(2,1, hspace=0, wspace=0,width_ratios = [1,2])
