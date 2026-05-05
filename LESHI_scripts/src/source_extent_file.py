@@ -312,6 +312,15 @@ def find_source_extent(source_data_table_input):
     source_data_table = source_data_table_input
 
     try:
+        a = source_data_table['x_coord'].values
+        b = source_data_table['y_coord'].values
+        c = source_data_table['z_channel'].values
+    except:
+        source_data_table['x_coord'] =  np.ones(len(source_data_table))*(-99)
+        source_data_table['y_coord'] =  np.ones(len(source_data_table))*(-99)
+        source_data_table['z_channel'] =  np.ones(len(source_data_table))*(-99)
+
+    try:
         a = source_data_table['x0_busy'].values
         
     except:
@@ -345,15 +354,18 @@ def find_source_extent(source_data_table_input):
 
     for source in range(len(source_data_table)):
         # data coordinates
-        try: x_pix, y_pix = source_data_table['x_coord'].values[source], source_data_table['y_coord'].values[source]
-        except: 
+        x_pix, y_pix = source_data_table['x_coord'].values[source], source_data_table['y_coord'].values[source]
+        if x_pix==-99: 
             ra, dec = source_data_table['RA_deg'].values[source], source_data_table['Dec_deg'].values[source]
             sky_coords =SkyCoord(ra, dec, unit="deg",frame="fk5")
             x_pix, y_pix = skycoord_to_pixel(SkyCoord(ra,dec, frame="fk5", unit="deg"),wcs_cube)
+            source_data_table['x_coord'].values[source], source_data_table['y_coord'].values[source] = x_pix, y_pix
         try:z_channel, sigma = source_data_table['int_im_channel'].values[source], (source_data_table['gauss_sigma'].values[source])
         except: 
             z_channel = frequency_to_channel(source_data_table['frequency_Hz'].values[source],wcs_cube)
             sigma = 5
+            source_data_table['z_channel'].values[source] = z_channel
+            
         x_pix,y_pix,z_channel  = int(x_pix),int(y_pix),int(z_channel)
     
         wavelength_range_left, wavelength_range_right = z_channel-200, z_channel+200
