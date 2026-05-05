@@ -9,7 +9,6 @@ import copy
 
 from scipy import special
 import matplotlib.pyplot as plt
-import corner
 from astropy.io import fits  # We use fits to open the actual data file
 from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord
