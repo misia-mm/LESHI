@@ -6,8 +6,10 @@ import pickle
 import emcee
 import glob
 import copy
+import os
 
 from scipy import special
+from scipy.signal import argrelextrema
 import matplotlib.pyplot as plt
 from astropy.io import fits  # We use fits to open the actual data file
 from astropy.wcs import WCS
@@ -17,8 +19,9 @@ from astropy.stats import sigma_clipped_stats, sigma_clip
 from spectral_cube import SpectralCube
 from p_tqdm import p_map
 import multiprocessing
+import matplotlib.pyplot as plt
 
-from scipy.signal import argrelextrema
+
 import warnings
 
 # Convert RuntimeWarning into an exception
