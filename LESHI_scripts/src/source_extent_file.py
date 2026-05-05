@@ -39,11 +39,13 @@ def sky_coord_in_deg_from_pix(x_pix_coord,y_pix_coord,wcs):
     DEC = skycoord.dec.degree
     return RA, DEC
 
-def frequency_to_channel(frequency,wave0,wavedelta,channel0):
+def frequency_to_channel(channel,wcs):
+    wave0,wavedelta,channel0 = wcs.wcs.crval[2],wcs.wcs.cdelt[2],wcs.wcs.crpix[2]
     channel = (frequency-wave0)/wavedelta+channel0
-    return channel
+    return frequency
     
-def channel_to_frequency(channel,wave0,wavedelta,channel0):
+def channel_to_frequency(channel,wcs):
+    wave0,wavedelta,channel0 = wcs.wcs.crval[2],wcs.wcs.cdelt[2],wcs.wcs.crpix[2]
     frequency = wave0+wavedelta*(channel-channel0)
     return frequency
 
@@ -102,7 +104,6 @@ def moment_0_map(xpix,ypix,zchannel_left,zchannel_right,map_size,cube,cube_data,
     
     
     return moment_0, mean, median, std, wcs_moment_0
-
 
 def read_in_radio_file(radio_file):
     cube=SpectralCube.read(radio_file)
@@ -288,10 +289,12 @@ def fit_busy_velocity_width(x,y,source):
         c = flat_samples[walker,5]
         C = flat_samples[walker,6]
         
-        W50_channels, W100_channels, x0 = calculate_velocity_widths(x,xp, xe, a, w, b, c, C, yerr)
-        W50_sampled_widths=np.append(W50_sampled_widths,W50_channels)
-        W100_sampled_widths=np.append(W100_sampled_widths,W100_channels)
-        x0_sampled = np.append(x0_sampled,x0)
+        try:
+            W50_channels, W100_channels, x0 = calculate_velocity_widths(x,xp, xe, a, w, b, c, C, yerr)
+            W50_sampled_widths=np.append(W50_sampled_widths,W50_channels)
+            W100_sampled_widths=np.append(W100_sampled_widths,W100_channels)
+            x0_sampled = np.append(x0_sampled,x0)
+        except: pass
     
 
     W50_channels, W100_channels, x0_channels = calculate_velocity_widths(x,fit_xp, fit_xe, fit_a, fit_w, fit_b, fit_c, fit_C, yerr)
@@ -332,8 +335,15 @@ def find_source_extent(source_data_table_input):
 
     for source in range(len(source_data_table)):
         # data coordinates
-        x_pix, y_pix = source_data_table['x_coord'].values[source], source_data_table['y_coord'].values[source]
-        z_channel, sigma = source_data_table['int_im_channel'].values[source], (source_data_table['gauss_sigma'].values[source])
+        try: x_pix, y_pix = source_data_table['x_coord'].values[source], source_data_table['y_coord'].values[source]
+        except: 
+            ra, dec = source_data_table['RA_deg'].values[source], source_data_table['Dec_deg'].values[source]
+            sky_coords =SkyCoord(ra, dec, unit="deg",frame="fk5")
+            x_pix, y_pix = skycoord_to_pixel(SkyCoord(ra,dec, frame="fk5", unit="deg"),wcs_cube)
+        try:z_channel, sigma = source_data_table['int_im_channel'].values[source], (source_data_table['gauss_sigma'].values[source])
+        except: 
+            z_channel = frequency_to_channel(source_data_table['frequency_Hz'].values[source],wcs_cube)
+            sigma = 5
         x_pix,y_pix,z_channel  = int(x_pix),int(y_pix),int(z_channel)
     
         wavelength_range_left, wavelength_range_right = z_channel-200, z_channel+200
@@ -453,7 +463,7 @@ def find_source_extent(source_data_table_input):
 
             # update parameters for each source
 
-            new_frequency = channel_to_frequency(x0,cube.wcs.wcs.crval[2],cube.wcs.wcs.cdelt[2],cube.wcs.wcs.crpix[2])
+            new_frequency = channel_to_frequency(x0,wcs_cube)
             new_z = (1420405000-new_frequency)/new_frequency
 
             source_data_table['x0_busy'].values[source],source_data_table['half_width'].values[source] =  x0, half_width
