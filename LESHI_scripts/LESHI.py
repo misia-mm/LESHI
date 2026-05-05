@@ -5,7 +5,7 @@ def source_finder(data_cube, path_to_results = "./",
                        SNR_spec=3.5, rsqr_min=0.35,
                        int_image_len=10, int_image_load_no=10,
                        channel_start=0, channel_end=None, beam=None, 
-                       bg_box_size=100, sloped_continuum = False,
+                       bg_box_size=100, sloped_baseline = False,
                        max_dist_pix=10, max_dist_channel=10, 
                        core_no=None, test_hist=False ):
     """Start the LESHI Source Finder. 
@@ -55,7 +55,7 @@ def source_finder(data_cube, path_to_results = "./",
     bg_box_size : int
         Width of the box in pixels used to calculate local background noise (default = 100).
 
-    sloped_continuum : bool
+    sloped_baseline : bool
         If set to True, the code will attempt to level the spectrum of the checked source to properly 
         determine its spectral SNR (default = False).
 
@@ -109,7 +109,7 @@ def source_finder(data_cube, path_to_results = "./",
                        SNR_spec, rsqr_min,
                        int_image_len,int_image_load_no,
                        channel_start,channel_end,beam,test_hist, 
-                       bg_box_size,max_dist_pix,max_dist_channel,sloped_continuum,core_no )
+                       bg_box_size,max_dist_pix,max_dist_channel,sloped_baseline,core_no )
         return df
     else:
         print('int_image_len should be an even number')
