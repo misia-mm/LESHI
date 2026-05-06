@@ -507,10 +507,13 @@ def find_source_extent(source_data_table_input):
             contour_sky = contour_sky_coord_in_deg_from_pix(source_contour,wcs_cube)
             with open(path_to_results+'/contours/'+"%s_contour.data"%(source_data_table['ID'].values[source]), 'wb') as f:
                 pickle.dump(contour_sky, f)
-                
+
+            # plot quick plots
             if not os.path.exists(path_to_results+'/extent_quick_plots'):
                 os.makedirs(path_to_results+'/extent_quick_plots')
             fig = plt.figure(figsize=(15,5))
+            fig.suptitle(source_data_table['ID'].values[source], fontsize=16)
+
             gs = fig.add_gridspec(1,2, hspace=0, wspace=0,width_ratios = [1,2])
             ax = gs.subplots()
             ax[0].imshow(moment_0,origin='lower')
@@ -526,8 +529,10 @@ def find_source_extent(source_data_table_input):
             ax[1].set_xlabel('channels [pix]')
             ax[1].set_ylabel('Flux')
             ax[1].axvline(  x0,color='gray',ls='--',alpha=0.4,lw=1,label='center')
-            ax[1].axvline(  x0-W50_channels/2,color='gray',ls='--',alpha=0.2,lw=1,label='W50')
-            ax[1].axvline(  x0+W50_channels/2,color='gray',ls='--',alpha=0.2,lw=1)
+            ax[1].axvline(  x0-W50_channels/2,color='gray',ls='--',alpha=0.3,lw=1,label='W50')
+            ax[1].axvline(  x0+W50_channels/2,color='gray',ls='--',alpha=0.3,lw=1)
+            ax[1].axvline(  x0-half_width,color='gray',ls='--',alpha=0.2,lw=1,label='full width')
+            ax[1].axvline(  x0+half_width,color='gray',ls='--',alpha=0.2,lw=1)
             ax[1].legend(loc='upper right')
             ax[1].yaxis.set_label_position("right")
             ax[1].yaxis.tick_right()
