@@ -495,7 +495,8 @@ def find_source_extent(source_data_table_input):
             source_data_table['W50'].values[source], source_data_table['W100'].values[source] = W50_channels, W100_channels
             source_data_table['W50_error'].values[source], source_data_table['W100_error'].values[source] = W50_channels_error, W100_channels_error
             source_data_table['frequency_Hz'].values[source],source_data_table['redshift'].values[source] = new_frequency, new_z
-            source_data_table['contour_diameter_arc'].values[source] = contour_diameter(source_contour)*dpix
+            contour_diameter_pix = contour_diameter(source_contour)
+            source_data_table['contour_diameter_arc'].values[source] = contour_diameter_pix*dpix
 
             source_data_table['RA_deg'].values[source],source_data_table['Dec_deg'].values[source] = sky_coord_in_deg_from_pix(x_pix,y_pix,wcs_cube)
             source_data_table['x_coord'].values[source], source_data_table['y_coord'].values[source] = x_pix, y_pix
@@ -512,16 +513,24 @@ def find_source_extent(source_data_table_input):
             fig = plt.figure(figsize=(15,5))
             gs = fig.add_gridspec(1,2, hspace=0, wspace=0,width_ratios = [1,2])
             ax = gs.subplots()
-            ax[0].imshow(moment_0)
+            ax[0].imshow(moment_0,origin='lower')
+            if 3*contour_diameter_pix < 60:
+                ax[0].set_xlim(int(moment_0.shape[0]/2)-30,int(moment_0.shape[0]/2)+30)
+                ax[0].set_ylim(int(moment_0.shape[0]/2)-30,int(moment_0.shape[0]/2)+30)
+            else:
+                ax[0].set_xlim(int(moment_0.shape[0]/2)-1.5*contour_diameter_pix,int(moment_0.shape[0]/2)+1.5*contour_diameter_pix)
+                ax[0].set_ylim(int(moment_0.shape[0]/2)-1.5*contour_diameter_pix,int(moment_0.shape[0]/2)+1.5*contour_diameter_pix)
             ax[0].plot(source_contour.T[0],source_contour.T[1],c='white',ls='--')
             ax[1].step(wavelength_range_array,flux,c='k',alpha=0.6,label='spectrum')
             ax[1].plot(wavelength_range_array,fit_y,c='blue',label='busy fit')
             ax[1].set_xlabel('channels [pix]')
             ax[1].set_ylabel('Flux')
             ax[1].axvline(  x0,color='gray',ls='--',alpha=0.4,lw=1,label='center')
-            ax[1].axvline(  x0-W50_channels,color='gray',ls='--',alpha=0.2,lw=1,label='W50')
-            ax[1].axvline(  x0+W50_channels,color='gray',ls='--',alpha=0.2,lw=1)
+            ax[1].axvline(  x0-W50_channels/2,color='gray',ls='--',alpha=0.2,lw=1,label='W50')
+            ax[1].axvline(  x0+W50_channels/2,color='gray',ls='--',alpha=0.2,lw=1)
             ax[1].legend(loc='upper right')
+            ax[1].yaxis.set_label_position("right")
+            ax[1].yaxis.tick_right()
             fig.savefig(path_to_results+'/extent_quick_plots/'+"%s_plot.jpg"%(source_data_table['ID'].values[source]))
                 
             
@@ -566,7 +575,7 @@ def source_extent_script(data_table, path_to_radio_file, initial_map_size_pix_in
     #filter_associated = (all_sources_dict['ID'].values==all_sources_dict['associated_with'].values)
     #all_sources_dict = all_sources_dict[filter_associated]
     
-    all_sources_dict.to_csv('found_sources_extent.csv',index=False)
+    all_sources_dict.to_csv(path_to_results+'/found_sources_extent.csv',index=False)
     
     return all_sources_dict
 
