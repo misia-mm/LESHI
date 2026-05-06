@@ -99,7 +99,7 @@ def moment_0_map(xpix,ypix,zchannel_left,zchannel_right,map_size,cube,cube_data,
 
     cubelet=cube[zchannel_left:zchannel_right,ypix_left:ypix_right,xpix_left:xpix_right]
     
-    wcs_moment_0 = 0
+    wcs_moment_0 = cubelet.wcs
     moment_0=np.nansum(np.array(cubelet.unmasked_data[:,:,:]),0)
     mean, median, std = sigma_clipped_stats(moment_0, sigma=3,maxiters=None)
     
@@ -356,9 +356,9 @@ def find_source_extent(source_data_table_input):
 
     for source in range(len(source_data_table)):
         # data coordinates
+        ra, dec = source_data_table['RA_deg'].values[source], source_data_table['Dec_deg'].values[source]
         x_pix, y_pix = source_data_table['x_coord'].values[source], source_data_table['y_coord'].values[source]
         if x_pix==-99: 
-            ra, dec = source_data_table['RA_deg'].values[source], source_data_table['Dec_deg'].values[source]
             sky_coords =SkyCoord(ra, dec, unit="deg",frame="fk5")
             x_pix, y_pix = skycoord_to_pixel(SkyCoord(ra,dec, frame="fk5", unit="deg"),wcs_cube)
             source_data_table['x_coord'].values[source], source_data_table['y_coord'].values[source] = x_pix, y_pix
@@ -397,6 +397,7 @@ def find_source_extent(source_data_table_input):
             contour_found=False
             if half_width<1:half_width=1
             moment_0, mean, median, std, wcs_moment_0 = moment_0_map(x_pix,y_pix,int(x0-half_width),int(x0+half_width),map_size_pix,cube,cube_data,cube_channel_length)
+            x_pix_moment_0, y_pix_moment_0 = skycoord_to_pixel(SkyCoord(ra,dec, frame="fk5", unit="deg"),wcs_moment_0)
             moment_0 = np.nan_to_num(moment_0)
             threshold_value = median + 3*std
             _, binary_image = cv2.threshold(moment_0.astype(np.float32), threshold_value, 1, cv2.THRESH_BINARY)
@@ -412,13 +413,12 @@ def find_source_extent(source_data_table_input):
                     final_contour.append(point[0])
                 final_contour.append(final_contour[0])
                 final_contour = np.array(final_contour)
-                if contour_contains_point(final_contour, int(moment_0.shape[0]/2),int(moment_0.shape[0]/2),moment_0.shape[0]): 
+                if contour_contains_point(final_contour, x_pix_moment_0, y_pix_moment_0,moment_0.shape[0]): 
                     source_contour = copy.deepcopy(final_contour)
                     contour_found=True
             if not contour_found:
                 fail_flag=1
                 source_data_table['contour_flag'].values[source] = fail_flag
-                #print('contour fail - tried again')
                 half_width=2*sigma
                 x0=z_channel
                 continue
