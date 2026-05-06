@@ -132,11 +132,11 @@ def calculate_velocity_widths(x,xp, xe, a, w, b, c, C, yerr):
     else:
         signal_channels = x_cont[model_cont>( (second_maximum-C)*0.05 + C )]
         W100_channels = (signal_channels[-1]-signal_channels[0])+0.1
+
+    zmin = signal_channels[0]
+    zmax = signal_channels[-1]
             
-    
-    
-   
-    return W50_channels, W100_channels, x0
+    return W50_channels, W100_channels, x0, zmin, zmax
 
 
 def find_peaks_of_busy_function(x, xp, xe, a, w, b, c, C, yerr):
@@ -244,7 +244,7 @@ def fit_busy(x,y,source):
     fit_C = np.percentile(flat_samples[:, 6], [50])[0]
     
 
-    W50_channels, W100_channels, x0_channels = calculate_velocity_widths(x,fit_xp, fit_xe, fit_a, fit_w, fit_b, fit_c, fit_C, yerr)
+    W50_channels, W100_channels, x0_channels, zmin, zmax = calculate_velocity_widths(x,fit_xp, fit_xe, fit_a, fit_w, fit_b, fit_c, fit_C, yerr)
     half_width = (W100_channels/2)
 
     
@@ -252,7 +252,7 @@ def fit_busy(x,y,source):
 
     rsqr = 1- (np.sum((y-fit_y)**2))/(np.sum((y-np.sum(y)/len(y))**2))
     # print('Rsqr: ',rsqr)
-    return rsqr, fit_y, fit_xp, fit_xe, fit_a, fit_w, fit_b, fit_c, fit_C, x0_channels, half_width
+    return rsqr, fit_y, fit_xp, fit_xe, fit_a, fit_w, fit_b, fit_c, fit_C, x0_channels, half_width, zmin, zmax
 
 def fit_busy_velocity_width(x,y,source):
     # starting parameters
@@ -291,21 +291,21 @@ def fit_busy_velocity_width(x,y,source):
         C = flat_samples[walker,6]
         
         try:
-            W50_channels, W100_channels, x0 = calculate_velocity_widths(x,xp, xe, a, w, b, c, C, yerr)
+            W50_channels, W100_channels, x0, zmin, zmax = calculate_velocity_widths(x,xp, xe, a, w, b, c, C, yerr)
             W50_sampled_widths=np.append(W50_sampled_widths,W50_channels)
             W100_sampled_widths=np.append(W100_sampled_widths,W100_channels)
             x0_sampled = np.append(x0_sampled,x0)
         except: pass
     
 
-    W50_channels, W100_channels, x0_channels = calculate_velocity_widths(x,fit_xp, fit_xe, fit_a, fit_w, fit_b, fit_c, fit_C, yerr)
+    W50_channels, W100_channels, x0_channels, zmin, zmax = calculate_velocity_widths(x,fit_xp, fit_xe, fit_a, fit_w, fit_b, fit_c, fit_C, yerr)
     
     half_width = (W100_channels/2)
     W50_channels_error = (np.percentile(W50_sampled_widths[1000:],84) - np.percentile(W50_sampled_widths[1000:],16))/2
     W100_channels_error = (np.percentile(W100_sampled_widths[1000:],84) - np.percentile(W100_sampled_widths[1000:],16))/2
     x0_channels_error = (np.percentile(x0_sampled[1000:],84) - np.percentile(x0_sampled[1000:],16))/2
 
-    return W50_channels, W50_channels_error, W100_channels, W100_channels_error, x0_channels, x0_channels_error, half_width
+    return W50_channels, W50_channels_error, W100_channels, W100_channels_error, x0_channels, x0_channels_error, half_width, zmin, zmax
 
 
 
@@ -340,7 +340,9 @@ def find_source_extent(source_data_table_input):
         source_data_table['x0_busy'], source_data_table['x0_busy_error'] = np.ones(len(source_data_table))*(-99), np.ones(len(source_data_table))*(-99)
         source_data_table['W100'], source_data_table['W100_error'] = np.ones(len(source_data_table))*(-99), np.ones(len(source_data_table))*(-99)
         source_data_table['W50'], source_data_table['W50_error'] = np.ones(len(source_data_table))*(-99), np.ones(len(source_data_table))*(-99)
-        
+
+        source_data_table['z_channel_min'] =  np.ones(len(source_data_table))*(-99)
+        source_data_table['z_channel_max'] =  np.ones(len(source_data_table))*(-99)
         
     
         source_data_table['fit_xp'] = np.ones(len(source_data_table))*np.array(source_data_table['gauss_x0'].values)
@@ -483,7 +485,7 @@ def find_source_extent(source_data_table_input):
         if fail_flag==0:
 
             # calculate velocity widths
-            W50_channels, W50_channels_error, W100_channels, W100_channels_error, x0_channels, x0_channels_error, half_width = fit_busy_velocity_width(wavelength_range_array,flux,source)
+            W50_channels, W50_channels_error, W100_channels, W100_channels_error, x0_channels, x0_channels_error, half_width, zmin, zmax = fit_busy_velocity_width(wavelength_range_array,flux,source)
 
             # update parameters for each source
 
@@ -501,6 +503,8 @@ def find_source_extent(source_data_table_input):
             source_data_table['RA_deg'].values[source],source_data_table['Dec_deg'].values[source] = sky_coord_in_deg_from_pix(x_pix,y_pix,wcs_cube)
             source_data_table['x_coord'].values[source], source_data_table['y_coord'].values[source] = x_pix, y_pix
             source_data_table['z_channel'].values[source] = int(x0)
+            source_data_table['z_channel_min'].values[source] = int(zmin)
+            source_data_table['z_channel_max'].values[source] = int(zmax)
 
             if not os.path.exists(path_to_results+'contours'):
                 os.makedirs(path_to_results+'contours')
@@ -531,8 +535,8 @@ def find_source_extent(source_data_table_input):
             ax[1].axvline(  x0,color='gray',ls='--',alpha=0.4,lw=1,label='center')
             ax[1].axvline(  x0-W50_channels/2,color='gray',ls='--',alpha=0.3,lw=1,label='W50')
             ax[1].axvline(  x0+W50_channels/2,color='gray',ls='--',alpha=0.3,lw=1)
-            ax[1].axvline(  x0-half_width,color='gray',ls='--',alpha=0.2,lw=1,label='full width')
-            ax[1].axvline(  x0+half_width,color='gray',ls='--',alpha=0.2,lw=1)
+            ax[1].axvline(  zmin,color='gray',ls='--',alpha=0.2,lw=1,label='full width')
+            ax[1].axvline(  zmax,color='gray',ls='--',alpha=0.2,lw=1)
             ax[1].legend(loc='upper right')
             ax[1].yaxis.set_label_position("right")
             ax[1].yaxis.tick_right()
