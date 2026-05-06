@@ -536,6 +536,11 @@ def find_source_extent(source_data_table_input):
             ax[1].legend(loc='upper right')
             ax[1].yaxis.set_label_position("right")
             ax[1].yaxis.tick_right()
+            if 8*half_width < 100:
+                ax[0].set_xlim(x0-50,x0+50)
+            else:
+                ax[0].set_xlim(x0-4*half_width,x0+4*half_width)
+               
             fig.savefig(path_to_results+'/extent_quick_plots/'+"%s_plot.jpg"%(source_data_table['ID'].values[source]))
                 
             
