@@ -127,10 +127,10 @@ def calculate_velocity_widths(x,xp, xe, a, w, b, c, C, yerr):
     x0 = int((np.nanmin(half_signal_channels) + np.nanmax(half_signal_channels))/2)
 
     if first_maximum>second_maximum:
-        signal_channels = x_cont[model_cont>( (first_maximum-C)*0.05 + C )]
+        signal_channels = x_cont[model_cont>( (first_maximum-C)*0.02 + C )]
         W100_channels = (signal_channels[-1]-signal_channels[0])+0.1
     else:
-        signal_channels = x_cont[model_cont>( (second_maximum-C)*0.05 + C )]
+        signal_channels = x_cont[model_cont>( (second_maximum-C)*0.02 + C )]
         W100_channels = (signal_channels[-1]-signal_channels[0])+0.1
 
     zmin = signal_channels[0]
@@ -210,17 +210,14 @@ def busy(x, xp, xe, a, w, b, c, C):
 # a and c in tandem control how deep the central through is
 # b - slope of the peaks, b>0
 
-def fit_busy(x,y,source):
+def fit_busy(x,y,initial_params):
     # starting parameters
-    if source_data_table['fit_xp'].values[source]>cube_channel_length-2:
-        source_data_table['fit_xp'].values[source] = cube_channel_length-3
-    if source_data_table['fit_xe'].values[source]>cube_channel_length-2:
-        source_data_table['fit_xe'].values[source] = cube_channel_length-3
+    if initial_params[0]>cube_channel_length-2:
+        initial_params[0] = cube_channel_length-3
+    if initial_params[1]>cube_channel_length-2:
+        initial_params[1] = cube_channel_length-3
         
-    pos = [source_data_table['fit_xp'].values[source],source_data_table['fit_xe'].values[source],
-           source_data_table['fit_a'].values[source], source_data_table['fit_w'].values[source],
-           source_data_table['fit_b'].values[source],source_data_table['fit_c'].values[source],
-           source_data_table['fit_C'].values[source]] +1e-4 * np.random.randn(32, 7)
+    pos = initial_params +1e-4 * np.random.randn(32, 7)
     pos = np.abs(pos)
     nwalkers, ndim = pos.shape
     #print(pos)
@@ -384,6 +381,8 @@ def find_source_extent(source_data_table_input):
         x0=z_channel
         map_size_pix = initial_map_size_pix
         half_width=int(2*sigma)
+        zmin,zmax = x0-half_width,x0+half_width
+        
         if half_width<1: half_width=1
         while True:
             
@@ -398,7 +397,7 @@ def find_source_extent(source_data_table_input):
                 
             contour_found=False
             if half_width<1:half_width=1
-            moment_0, mean, median, std, wcs_moment_0 = moment_0_map(x_pix,y_pix,int(x0-half_width),int(x0+half_width),map_size_pix,cube,cube_data,cube_channel_length)
+            moment_0, mean, median, std, wcs_moment_0 = moment_0_map(x_pix,y_pix,zmin,zmax,map_size_pix,cube,cube_data,cube_channel_length)
             x_pix_moment_0, y_pix_moment_0 = skycoord_to_pixel(SkyCoord(ra,dec, frame="fk5", unit="deg"),wcs_moment_0)
             moment_0 = np.nan_to_num(moment_0)
             threshold_value = median + 3*std
@@ -444,7 +443,7 @@ def find_source_extent(source_data_table_input):
                     print(mask.shape,image_slice.shape,moment_0.shape)
                     print(wavelength,y_pix_left,y_pix_right,x_pix_left,x_pix_right)
             
-            rsqr, fit_y, fit_xp, fit_xe, fit_a, fit_w, fit_b, fit_c, fit_C, x0, half_width = fit_busy(wavelength_range_array,flux,source)
+            rsqr, fit_y, fit_xp, fit_xe, fit_a, fit_w, fit_b, fit_c, fit_C, x0, half_width, zmin, zmax = fit_busy(wavelength_range_array,flux,source)
     
             # update the function parameters
             source_data_table['fit_xp'].values[source], source_data_table['fit_xe'].values[source] = fit_xp, fit_xe
