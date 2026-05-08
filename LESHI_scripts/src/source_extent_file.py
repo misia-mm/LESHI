@@ -138,7 +138,7 @@ def get_contour_spectrum(contour_sky,cube,wavelength_range_array):
     if x_pix_right>cube.shape[2]: x_pix_right=cube.shape[2]-1
     if y_pix_right>cube.shape[1]: y_pix_right=cube.shape[1]-1
 
-    zchannel_left, zchannel_right = wavelength_range_array[0], wavelength_range_array[-1]
+    z_channel_left, z_channel_right = wavelength_range_array[0], wavelength_range_array[-1]
 
     if z_channel_left<0:z_channel_left=0
     if z_channel_right>cube.shape[0]: z_channel_right = -1
