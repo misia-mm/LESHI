@@ -140,11 +140,11 @@ def get_contour_spectrum(contour_sky,cube,wavelength_range_array):
 
     zchannel_left, zchannel_right = wavelength_range_array[0], wavelength_range_array[-1]
 
-    if zchannel_left<0:zchannel_left=0
-    if zchannel_right>cube.shape[0]: zchannel_right = -1
-    zchannel_left, zchannel_right = int(zchannel_left), int(zchannel_right)
+    if z_channel_left<0:z_channel_left=0
+    if z_channel_right>cube.shape[0]: z_channel_right = -1
+    z_channel_left, z_channel_right = int(z_channel_left), int(z_channel_right)
 
-    cubelet=cube[zchannel_left:zchannel_right,ypix_left:ypix_right,xpix_left:xpix_right]
+    cubelet=cube[z_channel_left:z_channel_right,y_pix_left:y_pix_right,x_pix_left:x_pix_right]
     contour_pix = contour_coord_in_pix_from_deg(contour_sky,cubelet.wcs)
     
     mask = contour_to_mask(contour_pix,cubelet[0,:,:].shape)
