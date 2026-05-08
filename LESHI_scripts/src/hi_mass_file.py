@@ -32,10 +32,10 @@ def sky_coord_in_deg_from_pix(x_pix_coord,y_pix_coord,wcs):
     return RA, DEC
 
 def contour_sky_coord_in_deg_from_pix(contour,wcs):
-    contour_sky = contour.copy()
+    contour_sky = np.ones(contour.shape)
     for row in range(contour.shape[0]):
         ra,dec = sky_coord_in_deg_from_pix(contour[row][0],contour[row][1],wcs)
-        contour_sky[row][0],contour_sky[row][1] = float(ra),float(dec)
+        contour_sky[row][0],contour_sky[row][1] = ra,dec
     return contour_sky
 
 def contour_coord_in_pix_from_deg(contour,wcs):
