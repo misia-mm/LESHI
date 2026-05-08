@@ -72,6 +72,11 @@ def get_contour_spectrum(contour_sky,cube,wavelength_range_array):
     ra_min,dec_min = np.nanmin(contour_sky.T[0]),np.nanmin(contour_sky.T[1])
     x_pix_max, y_pix_max = skycoord_to_pixel(SkyCoord(ra_max,dec_max, frame="fk5", unit="deg"),cube.wcs)
     x_pix_min, y_pix_min = skycoord_to_pixel(SkyCoord(ra_min,dec_min, frame="fk5", unit="deg"),cube.wcs)
+    if x_pix_min>x_pix_max:
+        x_pix_min, x_pix_max = x_pix_max, x_pix_min
+    if y_pix_min>y_pix_max:
+        y_pix_min, y_pix_max = y_pix_max, y_pix_min
+    
     x_pix_max, y_pix_max = x_pix_max+10, y_pix_max+10
     x_pix_min, y_pix_min = x_pix_min-10, y_pix_min-10
     
@@ -84,20 +89,17 @@ def get_contour_spectrum(contour_sky,cube,wavelength_range_array):
     if y_pix_right>cube.shape[1]: y_pix_right=cube.shape[1]-1
 
     z_channel_left, z_channel_right = wavelength_range_array[0], wavelength_range_array[-1]
+    z_channel_left, z_channel_right = int(z_channel_left), int(z_channel_right)
 
-    if zchannel_left<0:zchannel_left=0
-    if zchannel_right>cube.shape[0]: zchannel_right = -1
-    zchannel_left, zchannel_right = int(zchannel_left), int(zchannel_right)
-
-    cubelet=cube[zchannel_left:zchannel_right,ypix_left:ypix_right,xpix_left:xpix_right]
+    cubelet=cube[z_channel_left:z_channel_right,y_pix_left:y_pix_right,x_pix_left:x_pix_right]
     contour_pix = contour_coord_in_pix_from_deg(contour_sky,cubelet.wcs)
     
     mask = contour_to_mask(contour_pix,cubelet[0,:,:].shape)
-    masked_cubelet = cubelet.with_mmask(mask)
+
     flux=np.zeros(len(wavelength_range_array))
-    for i, wavelength in enumerate(wavelength_range_array):     
+    for i in range(cubelet.shape[0]):     
         
-        image_slice = cubelet.unmasked_data[wavelength,:,:]
+        image_slice = cubelet.unmasked_data[i,:,:]
 
         # apply mask and sum up the flux in channel image
         flux[i] = np.nansum(image_slice[mask])
