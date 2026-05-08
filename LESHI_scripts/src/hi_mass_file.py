@@ -16,16 +16,14 @@ from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord
 from astropy.wcs.utils import skycoord_to_pixel
 from astropy.stats import sigma_clipped_stats, sigma_clip
+from astropy.cosmology import FlatLambdaCDM
 from spectral_cube import SpectralCube
 from p_tqdm import p_map
 import multiprocessing
 import matplotlib.pyplot as plt
 
-
 import warnings
 
-# Convert RuntimeWarning into an exception
-warnings.filterwarnings("error", category=RuntimeWarning)
 
 def sky_coord_in_deg_from_pix(x_pix_coord,y_pix_coord,wcs):
     skycoord = SkyCoord.from_pixel(xp=x_pix_coord,yp=y_pix_coord, wcs=wcs)
@@ -123,22 +121,74 @@ def measure_hi_mass(source_data_table_input):
             contours_sky = pickle.load(f)
 
         z_channel = source_data_table['z_channel_center'].values
+        channel_width = int((source_data_table['z_channel_max'].values[source]-source_data_table['z_channel_min'].values[source]))+1
+
+        # get flux baseline
+        wavelength_range_left, wavelength_range_right = source_data_table['z_channel_min'].values-100, source_data_table['z_channel_max'].values+100
+        if wavelength_range_left<0: wavelength_range_left=2
+        if wavelength_range_right>= cube_data.shape[0] : wavelength_range_right = cube_data.shape[0] -2
+        wavelength_range_array = np.arange(wavelength_range_left,wavelength_range_right,1,dtype=int)
+        
+        flux = get_contour_spectrum(contour_sky,cube,wavelength_range_array)
+        flux[50:50+channel_width] = np.median(flux)
+        baseline_constant = np.polyfit(np.arange(len(flux)), flux, 0)[0]
+
+        # measure flux
         wavelength_range_left, wavelength_range_right = source_data_table['z_channel_min'].values, source_data_table['z_channel_max'].values+1
         if wavelength_range_left<0: wavelength_range_left=2
         if wavelength_range_right>= cube_data.shape[0] : wavelength_range_right = cube_data.shape[0] -2
         wavelength_range_array = np.arange(wavelength_range_left,wavelength_range_right,1,dtype=int)
         
         flux = get_contour_spectrum(contour_sky,cube,wavelength_range_array)
-
+        
+        # subtract baseline
+        flux = flux - baseline_constant
         total_flux = np.nansum(flux)
         b_diameter_pix = np.median(beam_diameter_arcsec_array)/dpix
         total_flux_Jy_Hz = total_flux*wcs_cube.wcs.cdelt[0]*1/(np.pi*b_diameter_pix**2/(4*np.log(2)))
 
         # calculate error
-        total_flux_Jy_Hz = 
-
+        cubelet_width = int(source_data_table['contour_diameter_arcsec'].values[source]*4/dpix)
+        source_mask_3d = np.full((channel_width,cubelet_width,cubelet_width),False)
         
-        D_lumin = (source_data_table['redshift'].values[source])
+        for channel in range(channel_width):
+            source_mask_3d[channel,:,:][contour_mask]=True
+    
+        source_x_pix = source_data_table['x_pix_center'].values[source]
+        source_y_pix = source_data_table['y_pix_Center'].values[source]
+        source_z_channel = z_channel
+        
+        source_x_length_pix = int(source_data_table['contour_diameter_arcsec'].values[source]/dpix)
+        source_y_length_pix =int(source_data_table['contour_diameter_arcsec'].values[source]/dpix)
+        
+        voxel_grid_x_pix_array = np.ones(7)
+        voxel_grid_y_pix_array = np.ones(7)
+        
+        for i in range(7):
+            voxel_grid_x_pix_array[i] = int(source_x_pix+source_x_length_pix*(i-3))
+            voxel_grid_y_pix_array[i] = int(source_y_pix+source_y_length_pix*(i-3))
+
+        voxel_grid_x_pix_array[(voxel_grid_x_pix_array+ source_x_length_pix/2) >cube.shape[2] ] = cube.shape[2] - (source_x_length_pix/2+5)
+        voxel_grid_x_pix_array[(voxel_grid_x_pix_array-source_x_length_pix/2) <0 ] = (source_x_length_pix/2+5)
+        
+        voxel_grid_y_pix_array[(voxel_grid_y_pix_array+ source_y_length_pix/2) >cube.shape[1] ] = cube.shape[1] - (source_y_length_pix/2+5)
+        voxel_grid_y_pix_array[(voxel_grid_y_pix_array-source_y_length_pix/2) <0 ] = (source_y_length_pix/2+5)
+        
+        voxel_flux_cube_unit_array = np.ones((7,7))
+        for i in range(7):
+            for j in range(7):
+                cubelet = cube.unmasked_data[wavelength_range_left:wavelength_range_right,
+                               int(voxel_grid_y_pix_array[i]-0.5*cubelet_width):int(voxel_grid_y_pix_array[i]+0.5*cubelet_width),
+                               int(voxel_grid_x_pix_array[j]-0.5*cubelet_width):int(voxel_grid_x_pix_array[j]+0.5*cubelet_width)]
+                voxel_flux_cube_unit = np.nansum(cubelet[source_mask_3d]).value
+                voxel_flux_cube_unit_array[i][j] = voxel_flux_cube_unit
+        
+        mean, median, std =sigma_clipped_stats(voxel_flux_cube_unit_array.flatten(), sigma=5,maxiters=None)
+        
+        total_flux_Jy_Hz_error=std*wcs_cube.wcs.cdelt[0]*1/(np.pi*b_diameter_pix**2/(4*np.log(2)))
+
+        cosmo = FlatLambdaCDM(H0=70, Om0=0.3)
+        D_lumin = cosmo.luminosity_distance(source_data_table['redshift'].values[source]).value
         MHI_mass = np.log10(49.7*total_flux_Jy_Hz*D_lumin**2)
         MHI_mass_error = total_flux_error/total_flux/np.log(10)
 
