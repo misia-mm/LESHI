@@ -399,6 +399,7 @@ def find_source_extent(source_data_table_input):
                 continue
                 
             contour_sky = contour_sky_coord_in_deg_from_pix(source_contour,wcs_moment_0)
+            print(contour_sky)
             flux = get_contour_spectrum(contour_sky,cube,wavelength_range_array)
             
             rsqr, fit_y, fit_xp, fit_xe, fit_a, fit_w, fit_b, fit_c, fit_C, x0, half_width, zmin, zmax = fit_busy(wavelength_range_array,flux,initial_params)
