@@ -52,10 +52,10 @@ def circular_contour(x_cen,y_cent,radius):
     return contour
 
 def contour_sky_coord_in_deg_from_pix(contour,wcs):
-    contour_sky = contour.copy()
+    contour_sky = np.ones(contour.shape)
     for row in range(contour.shape[0]):
         ra,dec = sky_coord_in_deg_from_pix(contour[row][0],contour[row][1],wcs)
-        contour_sky[row][0],contour_sky[row][1] = float(ra),float(dec)
+        contour_sky[row][0],contour_sky[row][1] = ra,dec
     return contour_sky
 
 def contour_coord_in_pix_from_deg(contour,wcs):
@@ -127,6 +127,11 @@ def get_contour_spectrum(contour_sky,cube,wavelength_range_array):
     ra_min,dec_min = np.nanmin(contour_sky.T[0]),np.nanmin(contour_sky.T[1])
     x_pix_max, y_pix_max = skycoord_to_pixel(SkyCoord(ra_max,dec_max, frame="fk5", unit="deg"),cube.wcs)
     x_pix_min, y_pix_min = skycoord_to_pixel(SkyCoord(ra_min,dec_min, frame="fk5", unit="deg"),cube.wcs)
+    if x_pix_min>x_pix_max:
+        x_pix_min, x_pix_max = x_pix_max, x_pix_min
+    if y_pix_min>y_pix_max:
+        y_pix_min, y_pix_max = y_pix_max, y_pix_min
+    
     x_pix_max, y_pix_max = x_pix_max+10, y_pix_max+10
     x_pix_min, y_pix_min = x_pix_min-10, y_pix_min-10
     
@@ -145,6 +150,7 @@ def get_contour_spectrum(contour_sky,cube,wavelength_range_array):
     contour_pix = contour_coord_in_pix_from_deg(contour_sky,cubelet.wcs)
     
     mask = contour_to_mask(contour_pix,cubelet[0,:,:].shape)
+
     flux=np.zeros(len(wavelength_range_array))
     for i in range(cubelet.shape[0]):     
         
@@ -238,7 +244,7 @@ def log_likelihood_busy(theta, x, y, yerr):
 
 def log_prior_busy(x,theta):
     xp, xe, a, w, b, c, C = theta
-    if a>0 and w>=3 and 100>b>=0 and c>=0 and 0<xp<cube_channel_length-1 and 0<xe<cube_channel_length-1 :
+    if a>0 and w>=3 and 10>b>=0 and c>=0 and 0<xp<cube_channel_length-1 and 0<xe<cube_channel_length-1 :
         return 0.0
 
     return -np.inf
@@ -356,7 +362,7 @@ def find_source_extent(source_data_table_input):
         except:zmin,zmax = x0-int(2*sigma),x0+int(2*sigma)
 
         initial_params = [z_channel,z_channel,1,10,np.sqrt(np.pi/2)/sigma,1e-4*1.1,gauss_H]
-        if initial_params[4]>=100: initial_params[4] = 99
+        if initial_params[4]>=10: initial_params[4] = 9
         
         while True:
             
@@ -398,8 +404,8 @@ def find_source_extent(source_data_table_input):
                 x0=z_channel
                 continue
                 
+            mask = contour_to_mask(source_contour,moment_0.shape)
             contour_sky = contour_sky_coord_in_deg_from_pix(source_contour,wcs_moment_0)
-            print(contour_sky)
             flux = get_contour_spectrum(contour_sky,cube,wavelength_range_array)
             
             rsqr, fit_y, fit_xp, fit_xe, fit_a, fit_w, fit_b, fit_c, fit_C, x0, half_width, zmin, zmax = fit_busy(wavelength_range_array,flux,initial_params)
@@ -548,7 +554,7 @@ def source_extent_script(data_table, path_to_radio_file, initial_map_size_pix_in
     else: core_number = core_no_input 
         
     source_extent_results = p_map(find_source_extent,
-                                      [data_table[i:(i+1)] for i in range(len(data_table))],num_cpus=core_number)
+                                     [data_table[i:(i+1)] for i in range(len(data_table))],num_cpus=core_number)
     all_sources_dict = pd.concat(source_extent_results)
     all_sources_dict = associate_sources_final(all_sources_dict)
     #filter_associated = (all_sources_dict['ID'].values==all_sources_dict['associated_with'].values)
