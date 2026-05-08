@@ -183,7 +183,7 @@ def source_hi_mass(data_table, data_cube, path_to_contours='./', path_to_results
     df = hi_mass_file.hi_mass_script(data_table, data_cube, path_to_contours, path_to_results, core_no)
     return df
     
-def source_extent(data_table, data_cube, min_window_width_pix=100, min_diameter_pix_input=None,path_to_results='./',core_no=None):
+def source_extent(data_table, data_cube, min_window_width_pix=100, min_diameter_pix=None,path_to_results='./',core_no=None):
     from .src import source_extent_file
   
     df = source_extent_file.source_extent_script(data_table, data_cube, min_window_width_pix, min_diameter_pix, path_to_results, core_no)
