@@ -299,7 +299,7 @@ def fit_busy(x,y,initial_params):
     
     fit_y =busy(x, fit_xp, fit_xe, fit_a, fit_w, fit_b, fit_c, fit_C)
 
-    rsqr = 1- (np.sum((y-fit_y)**2))/(np.sum((y-np.sum(y)/len(y))**2))
+    rsqr = 1- (np.nansum((y-fit_y)**2))/(np.sum((y-np.nansum(y)/len(y))**2))
     # print('Rsqr: ',rsqr)
     return rsqr, fit_y, fit_xp, fit_xe, fit_a, fit_w, fit_b, fit_c, fit_C, x0_channels, half_width, zmin, zmax
 
