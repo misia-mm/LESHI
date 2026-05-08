@@ -48,7 +48,7 @@ def circular_contour(x_cen,y_cent,radius):
     x_array = radius*np.cos(thetas)
     y_array = radius*np.sin(thetas)
     contour = np.array([x_array,y_array]).T
-    contour = np.append(contour,[x_array[0],y_array[0]])
+    contour = np.append(contour,[ [x_array[0],y_array[0]] ],axis=0)
     return contour
 
 def contour_sky_coord_in_deg_from_pix(contour,wcs):
