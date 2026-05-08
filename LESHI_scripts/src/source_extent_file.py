@@ -323,7 +323,7 @@ def find_source_extent(source_data_table_input):
         source_data_table['z_channel_min'] =  np.ones(len(source_data_table))*(-99)
         source_data_table['z_channel_max'] =  np.ones(len(source_data_table))*(-99)
         
-        source_data_table['contour_diameter_arc'] = np.ones(len(source_data_table))*beam_arc
+        source_data_table['contour_diameter_arc'] = np.ones(len(source_data_table))*(-99)
         source_data_table['contour_flag'] = np.ones(len(source_data_table))
         
     for source in range(len(source_data_table)):
