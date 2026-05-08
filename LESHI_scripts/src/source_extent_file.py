@@ -536,7 +536,7 @@ def associate_sources_final(found_sources_dict):
         found_sources_dict['associated_with'].values[source] = found_sources_dict['ID'].values[match_id[np.argmax(found_sources_dict['z_channel'].values[match_id])]]     
     return found_sources_dict
 
-def source_extent_script(data_table, path_to_radio_file, initial_map_size_pix_input, min_diameter_pix_input,path_to_results_input,core_no_input ):
+def source_extent_script(data_table, path_to_radio_file, initial_map_size_pix_input, min_diameter_arc_input,path_to_results_input,core_no_input ):
     global cube, cube_data, wcs_cube, cube_channel_length, initial_map_size_pix, dpix, path_to_results, min_diameter_pix, beam_diameter_arcsec_array
     initial_map_size_pix = initial_map_size_pix_input
     path_to_results = path_to_results_input
