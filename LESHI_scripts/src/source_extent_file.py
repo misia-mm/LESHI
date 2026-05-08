@@ -139,20 +139,16 @@ def get_contour_spectrum(contour_sky,cube,wavelength_range_array):
     if y_pix_right>cube.shape[1]: y_pix_right=cube.shape[1]-1
 
     z_channel_left, z_channel_right = wavelength_range_array[0], wavelength_range_array[-1]
-
-    if z_channel_left<0:z_channel_left=0
-    if z_channel_right>cube.shape[0]: z_channel_right = -1
     z_channel_left, z_channel_right = int(z_channel_left), int(z_channel_right)
 
     cubelet=cube[z_channel_left:z_channel_right,y_pix_left:y_pix_right,x_pix_left:x_pix_right]
     contour_pix = contour_coord_in_pix_from_deg(contour_sky,cubelet.wcs)
     
     mask = contour_to_mask(contour_pix,cubelet[0,:,:].shape)
-    masked_cubelet = cubelet.with_mmask(mask)
     flux=np.zeros(len(wavelength_range_array))
-    for i, wavelength in enumerate(wavelength_range_array):     
+    for i in range(cubelet.shape[0]):     
         
-        image_slice = cubelet.unmasked_data[wavelength,:,:]
+        image_slice = cubelet.unmasked_data[i,:,:]
 
         # apply mask and sum up the flux in channel image
         flux[i] = np.nansum(image_slice[mask])
