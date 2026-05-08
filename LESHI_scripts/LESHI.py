@@ -177,20 +177,20 @@ def source_velocity_width(data_table, path_to_radio_file, path_to_contours='./',
     df = velocity_width_file.velocity_width_script(data_table, path_to_radio_file, path_to_contours, path_to_results, core_no)
     return df
 
-def source_hi_mass(data_table, path_to_radio_file, path_to_contours='./', path_to_results='./', core_no=None):
+def source_hi_mass(data_table, data_cube, path_to_contours='./', path_to_results='./', core_no=None):
     from .src import hi_mass_file
 
-    df = hi_mass_file.hi_mass_script(data_table, path_to_radio_file, path_to_contours, path_to_results, core_no)
+    df = hi_mass_file.hi_mass_script(data_table, data_cube, path_to_contours, path_to_results, core_no)
     return df
     
-def source_extent(data_table, path_to_radio_file, min_window_width_pix=100, min_diameter_pix_input=None,path_to_results='./',core_no=None):
+def source_extent(data_table, data_cube, min_window_width_pix=100, min_diameter_pix_input=None,path_to_results='./',core_no=None):
     from .src import source_extent_file
   
-    df = source_extent_file.source_extent_script(data_table, path_to_radio_file, min_window_width_pix, min_diameter_pix, path_to_results, core_no)
+    df = source_extent_file.source_extent_script(data_table, data_cube, min_window_width_pix, min_diameter_pix, path_to_results, core_no)
     return df
 
-def emission_plot(data_table, path_to_data_cube, path_to_optical_images='./optical_images/', path_to_results='./',
+def emission_plot(data_table, data_cube, path_to_optical_images='./optical_images/', path_to_results='./',
                    image_arc_width=100,spectrum_length=200,beam=None,filetype='png'):
     from .src import emission_plot_file
-    emission_plot_file.emission_plot_script(data_table,path_to_data_cube,path_to_optical_images,path_to_results,image_arc_width,spectrum_length,beam,filetype)
+    emission_plot_file.emission_plot_script(data_table,data_cube,path_to_optical_images,path_to_results,image_arc_width,spectrum_length,beam,filetype)
 
