@@ -655,6 +655,8 @@ def source_finder_func(data_file, path_to_results,
     print('max_dist_channel: %s'%(max_dist_channel_input))
     print('test_hist: %s'%(output_test_history))
     print('\n')
+    print('Median beam diameter [pix]: %s'%(np.median(beams_pixel_diameter_array)))
+    print('\n')
     
     print('Chosen width of frequency slab to be integrated: %s channels'%(int_image_length))
     print('Chosen number of channels to perform sourcefinding on: %s'%(cube_end-cube_start))
@@ -732,7 +734,7 @@ def source_finder_func(data_file, path_to_results,
         n_sources = len(all_sources_dict[filter_passed_associated])
         print('fitting Gaussian function for %s sources using %s cores'%(n_sources,core_number))  
         gaussian_fit_check_results = p_map(check_source_gaussian_fit,
-                                      [all_sources_dict[filter_passed_associated][i:(i+1)] for i in range(len(all_sources_dict[filter_passed_associated]))],num_cpus=core_number)
+                                      [all_sources_dict[filter_passed_associated][i*int((n_sources)/core_number+1):(i+1)*int((n_sources)/core_number+1)] for i in range(core_number)],num_cpus=core_number)
         if len(gaussian_fit_check_results)>0: all_sources_dict = pd.concat([all_sources_dict[~filter_passed_associated],pd.concat(gaussian_fit_check_results)])
         
         # get sky coordinates and frequency for each source
