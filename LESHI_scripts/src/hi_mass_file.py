@@ -32,10 +32,10 @@ def sky_coord_in_deg_from_pix(x_pix_coord,y_pix_coord,wcs):
     return RA, DEC
 
 def contour_sky_coord_in_deg_from_pix(contour,wcs):
-    contour_sky = np.ones(contour.shape)
+    contour_sky = contour.copy()
     for row in range(contour.shape[0]):
         ra,dec = sky_coord_in_deg_from_pix(contour[row][0],contour[row][1],wcs)
-        contour_sky[row][0],contour_sky[row][1] = ra,dec
+        contour_sky[row][0],contour_sky[row][1] = float(ra),float(dec)
     return contour_sky
 
 def contour_coord_in_pix_from_deg(contour,wcs):
@@ -81,7 +81,6 @@ def get_contour_spectrum(contour_sky,cube,wavelength_range_array):
 
     cubelet=cube[z_channel_left:z_channel_right,y_pix_left:y_pix_right,x_pix_left:x_pix_right]
     contour_pix = contour_coord_in_pix_from_deg(contour_sky,cubelet.wcs)
-    
     mask = contour_to_mask(contour_pix,cubelet[0,:,:].shape)
 
     flux=np.zeros(len(wavelength_range_array))
@@ -118,22 +117,13 @@ def measure_hi_mass(source_data_table_input):
     
     for source in range(len(source_data_table)):
         
-        contour_file = path_to_contours+'/contours/%s_contours_sky.data'%(source_data_table['ID'].values[source])
+        contour_file = path_to_contours+'/contours/%s_contour.data'%(source_data_table['ID'].values[source])
         with open(contour_file, 'rb') as f:
-            contours_sky = pickle.load(f)
+            contour_sky = pickle.load(f)
 
         z_channel = source_data_table['z_channel_center'].values
         channel_width = int((source_data_table['z_channel_max'].values[source]-source_data_table['z_channel_min'].values[source]))+1
 
-        # get flux baseline
-        wavelength_range_left, wavelength_range_right = source_data_table['z_channel_min'].values-100, source_data_table['z_channel_max'].values+100
-        if wavelength_range_left<0: wavelength_range_left=2
-        if wavelength_range_right>= cube_data.shape[0] : wavelength_range_right = cube_data.shape[0] -2
-        wavelength_range_array = np.arange(wavelength_range_left,wavelength_range_right,1,dtype=int)
-        
-        flux = get_contour_spectrum(contour_sky,cube,wavelength_range_array)
-        flux[50:50+channel_width] = np.median(flux)
-        baseline_constant = np.polyfit(np.arange(len(flux)), flux, 0)[0]
 
         # measure flux
         wavelength_range_left, wavelength_range_right = source_data_table['z_channel_min'].values, source_data_table['z_channel_max'].values+1
@@ -142,26 +132,36 @@ def measure_hi_mass(source_data_table_input):
         wavelength_range_array = np.arange(wavelength_range_left,wavelength_range_right,1,dtype=int)
         
         flux = get_contour_spectrum(contour_sky,cube,wavelength_range_array)
-        
+        mean, median, std =sigma_clipped_stats(flux, sigma=5,maxiters=None)
         # subtract baseline
-        flux = flux - baseline_constant
+        flux = flux - median
         total_flux = np.nansum(flux)
         b_diameter_pix = np.median(beam_diameter_arcsec_array)/dpix
-        total_flux_Jy_Hz = total_flux*wcs_cube.wcs.cdelt[0]*1/(np.pi*b_diameter_pix**2/(4*np.log(2)))
+
+        total_flux_Jy_Hz = total_flux*np.abs(wcs_cube.wcs.cdelt[2])*1/(np.pi*b_diameter_pix**2/(4*np.log(2)))
+
 
         # calculate error
-        cubelet_width = int(source_data_table['contour_diameter_arcsec'].values[source]*4/dpix)
+        cubelet_width = int(source_data_table['contour_diameter_arc'].values[source]*4/dpix)
         source_mask_3d = np.full((channel_width,cubelet_width,cubelet_width),False)
-        
+
+        source_x_pix = source_data_table['x_pix_center'].values[source]
+        source_y_pix = source_data_table['y_pix_center'].values[source]
+        source_z_channel = z_channel
+
+        cubelet = cube[int(wavelength_range_left):int(wavelength_range_right),
+                               int(source_y_pix-0.5*cubelet_width):int(source_y_pix+0.5*cubelet_width),
+                               int(source_x_pix-0.5*cubelet_width):int(source_x_pix+0.5*cubelet_width)]
+
+        contour_pix = contour_coord_in_pix_from_deg(contour_sky,cubelet.wcs)
+        contour_mask = contour_to_mask(contour_pix,source_mask_3d[0,:,:].shape)
         for channel in range(channel_width):
             source_mask_3d[channel,:,:][contour_mask]=True
     
-        source_x_pix = source_data_table['x_pix_center'].values[source]
-        source_y_pix = source_data_table['y_pix_Center'].values[source]
-        source_z_channel = z_channel
         
-        source_x_length_pix = int(source_data_table['contour_diameter_arcsec'].values[source]/dpix)
-        source_y_length_pix =int(source_data_table['contour_diameter_arcsec'].values[source]/dpix)
+        
+        source_x_length_pix = int(source_data_table['contour_diameter_arc'].values[source]/dpix)
+        source_y_length_pix =int(source_data_table['contour_diameter_arc'].values[source]/dpix)
         
         voxel_grid_x_pix_array = np.ones(7)
         voxel_grid_y_pix_array = np.ones(7)
@@ -170,29 +170,31 @@ def measure_hi_mass(source_data_table_input):
             voxel_grid_x_pix_array[i] = int(source_x_pix+source_x_length_pix*(i-3))
             voxel_grid_y_pix_array[i] = int(source_y_pix+source_y_length_pix*(i-3))
 
-        voxel_grid_x_pix_array[(voxel_grid_x_pix_array+ source_x_length_pix/2) >cube.shape[2] ] = cube.shape[2] - (source_x_length_pix/2+5)
-        voxel_grid_x_pix_array[(voxel_grid_x_pix_array-source_x_length_pix/2) <0 ] = (source_x_length_pix/2+5)
+        voxel_grid_x_pix_array[(voxel_grid_x_pix_array+ 0.5*cubelet_width) >cube.shape[2] ] = cube.shape[2] - (cubelet_width/2+5)
+        voxel_grid_x_pix_array[(voxel_grid_x_pix_array-0.5*cubelet_width) <0 ] = (cubelet_width/2+5)
         
-        voxel_grid_y_pix_array[(voxel_grid_y_pix_array+ source_y_length_pix/2) >cube.shape[1] ] = cube.shape[1] - (source_y_length_pix/2+5)
-        voxel_grid_y_pix_array[(voxel_grid_y_pix_array-source_y_length_pix/2) <0 ] = (source_y_length_pix/2+5)
+        voxel_grid_y_pix_array[(voxel_grid_y_pix_array+ 0.5*cubelet_width) >cube.shape[1] ] = cube.shape[1] - (cubelet_width/2+5)
+        voxel_grid_y_pix_array[(voxel_grid_y_pix_array-0.5*cubelet_width) <0 ] = (cubelet_width/2+5)
         
         voxel_flux_cube_unit_array = np.ones((7,7))
         for i in range(7):
             for j in range(7):
-                cubelet = cube.unmasked_data[wavelength_range_left:wavelength_range_right,
+                cubelet = cube.unmasked_data[int(wavelength_range_left):int(wavelength_range_right),
                                int(voxel_grid_y_pix_array[i]-0.5*cubelet_width):int(voxel_grid_y_pix_array[i]+0.5*cubelet_width),
                                int(voxel_grid_x_pix_array[j]-0.5*cubelet_width):int(voxel_grid_x_pix_array[j]+0.5*cubelet_width)]
                 voxel_flux_cube_unit = np.nansum(cubelet[source_mask_3d]).value
                 voxel_flux_cube_unit_array[i][j] = voxel_flux_cube_unit
         
         mean, median, std =sigma_clipped_stats(voxel_flux_cube_unit_array.flatten(), sigma=5,maxiters=None)
-        
-        total_flux_Jy_Hz_error=std*wcs_cube.wcs.cdelt[0]*1/(np.pi*b_diameter_pix**2/(4*np.log(2)))
+        total_flux_error = std
+        total_flux_Jy_Hz_error=std*wcs_cube.wcs.cdelt[2]*1/(np.pi*b_diameter_pix**2/(4*np.log(2)))
 
         cosmo = FlatLambdaCDM(H0=70, Om0=0.3)
         D_lumin = cosmo.luminosity_distance(source_data_table['redshift'].values[source]).value
-        MHI_mass = np.log10(49.7*total_flux_Jy_Hz*D_lumin**2)
+        try:MHI_mass = np.log10(49.7*total_flux_Jy_Hz*D_lumin**2)
+        except: print(source_data_table['ID'].values[source])
         MHI_mass_error = total_flux_error/total_flux/np.log(10)
+        SNR = total_flux/total_flux_error
 
         source_data_table['log_MHI'].values[source], source_data_table['log_MHI_error'].values[source] = MHI_mass, MHI_mass_error
         source_data_table['flux_Jy_Hz'].values[source], source_data_table['flux_Jy_Hz_error'].values[source] = total_flux_Jy_Hz, total_flux_Jy_Hz_error
@@ -216,7 +218,7 @@ def hi_mass_script(data_table, path_to_radio_file, path_to_contours_input, path_
                                       [data_table[i:(i+1)] for i in range(len(data_table))], num_cpus=core_number)
     all_sources_dict = pd.concat(hi_mass_results)
     
-    all_sources_dict.to_csv(path_to_results+'/found_sources_extent.csv',index=False)
+    all_sources_dict.to_csv(path_to_results+'/found_sources_hi_mass.csv',index=False)
     
     return all_sources_dict
 
