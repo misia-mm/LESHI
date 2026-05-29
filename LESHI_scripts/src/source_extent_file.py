@@ -462,8 +462,9 @@ def find_source_extent(source_data_table_input):
 
         if fail_flag==0:contour_diameter_pix = contour_diameter(source_contour)
         if fail_flag==1 or contour_diameter_pix<min_diameter_pix:
-            if fail_flag==1: x_pix, y_pix = skycoord_to_pixel(SkyCoord(ra,dec, frame="fk5", unit="deg"),wcs_cube)
-            
+            if fail_flag==1: 
+                x_pix, y_pix = skycoord_to_pixel(SkyCoord(ra,dec, frame="fk5", unit="deg"),wcs_cube)
+                
             source_contour = circular_contour(x_pix,y_pix,min_diameter_pix/2)
             contour_diameter_pix = contour_diameter(source_contour)
             contour_sky = contour_sky_coord_in_deg_from_pix(source_contour,wcs_cube)
@@ -562,7 +563,7 @@ def associate_sources_final(found_sources_dict):
         dist = np.sqrt( (found_sources_dict['x_pix_center'].values[source] - found_sources_dict['x_pix_center'].values)**2 +
                         (found_sources_dict['y_pix_center'].values[source] - found_sources_dict['y_pix_center'].values)**2)
         dist_channel = np.absolute(found_sources_dict['z_channel_center'].values[source]-found_sources_dict['z_channel_center'].values)
-        match_id = np.arange(0,len(found_sources_dict))[(dist<found_sources_dict['contour_diameter_arc'].values[source]/3*dpix)&(dist_channel<=(found_sources_dict['z_channel_max'].values[source]-found_sources_dict['z_channel_min'].values[source])/2)]
+        match_id = np.arange(0,len(found_sources_dict))[(dist<found_sources_dict['contour_diameter_arc'].values[source]/3/dpix)&(dist_channel<=(found_sources_dict['z_channel_max'].values[source]-found_sources_dict['z_channel_min'].values[source])/2)]
         found_sources_dict['associated_with'].values[source] = found_sources_dict['ID'].values[match_id[np.argmax(found_sources_dict['z_channel_center'].values[match_id])]]     
     return found_sources_dict
 
@@ -572,7 +573,7 @@ def source_extent_script(data_table, path_to_radio_file, initial_map_size_pix_in
     path_to_results = path_to_results_input
     cube, cube_data, wcs_cube, cube_channel_length, dpix, beam_diameter_arcsec_array =read_in_radio_file(path_to_radio_file)
     if min_diameter_arc_input == None:
-        min_diameter_pix = int(np.median(beam_diameter_arcsec_array)/dpix)*2
+        min_diameter_pix = int(np.median(beam_diameter_arcsec_array)/dpix)
     else:
         min_diameter_pix = min_diameter_arc_input/dpix
     if core_no_input == None: core_number = multiprocessing.cpu_count()
