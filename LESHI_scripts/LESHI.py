@@ -56,8 +56,7 @@ def source_finder(data_cube, path_to_results = "./",
         Width of the box in pixels used to calculate local background noise (default = 100).
 
     sloped_baseline : bool
-        If set to True, the code will attempt to level the spectrum of the checked source to properly 
-        determine its spectral SNR (default = False).
+        If set to True, the code will attempt to subtract the fitted noise baseline (default = False).
 
     max_dist_pix : int
         Maximal distance in pixels between two sources to be associated into one source (defualt = 10).
