@@ -124,17 +124,27 @@ def measure_hi_mass(source_data_table_input):
         z_channel = source_data_table['z_channel_center'].values
         channel_width = int((source_data_table['z_channel_max'].values[source]-source_data_table['z_channel_min'].values[source]))+1
 
-
-        # measure flux
-        wavelength_range_left, wavelength_range_right = source_data_table['z_channel_min'].values, source_data_table['z_channel_max'].values+1
+        # get flux baseline
+        wavelength_range_left, wavelength_range_right = source_data_table['z_channel_min'].values[source]-100, source_data_table['z_channel_max'].values[source]+100
         if wavelength_range_left<0: wavelength_range_left=2
         if wavelength_range_right>= cube_data.shape[0] : wavelength_range_right = cube_data.shape[0] -2
         wavelength_range_array = np.arange(wavelength_range_left,wavelength_range_right,1,dtype=int)
         
         flux = get_contour_spectrum(contour_sky,cube,wavelength_range_array)
-        mean, median, std =sigma_clipped_stats(flux, sigma=5,maxiters=None)
+        flux[np.where(wavelength_range_array==source_data_table['z_channel_min'].values[source]):
+            np.where(wavelength_range_array==source_data_table['z_channel_max'].values[source])] = np.median(flux)
+        baseline_constant = np.polyfit(np.arange(len(flux)), flux, 0)[0]
+
+        # measure flux
+        wavelength_range_left, wavelength_range_right = source_data_table['z_channel_min'].values[source], source_data_table['z_channel_max'].values[source]+1
+        if wavelength_range_left<0: wavelength_range_left=2
+        if wavelength_range_right>= cube_data.shape[0] : wavelength_range_right = cube_data.shape[0] -2
+        wavelength_range_array = np.arange(wavelength_range_left,wavelength_range_right,1,dtype=int)
+        
+        flux = get_contour_spectrum(contour_sky,cube,wavelength_range_array)
+        
         # subtract baseline
-        flux = flux - median
+        flux = flux - baseline_constant
         total_flux = np.nansum(flux)
         b_diameter_pix = np.median(beam_diameter_arcsec_array)/dpix
 
@@ -191,8 +201,7 @@ def measure_hi_mass(source_data_table_input):
 
         cosmo = FlatLambdaCDM(H0=70, Om0=0.3)
         D_lumin = cosmo.luminosity_distance(source_data_table['redshift'].values[source]).value
-        try:MHI_mass = np.log10(49.7*total_flux_Jy_Hz*D_lumin**2)
-        except: print(source_data_table['ID'].values[source])
+        MHI_mass = np.log10(49.7*total_flux_Jy_Hz*D_lumin**2)
         MHI_mass_error = total_flux_error/total_flux/np.log(10)
         SNR = total_flux/total_flux_error
 
