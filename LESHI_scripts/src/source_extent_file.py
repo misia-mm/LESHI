@@ -153,7 +153,7 @@ def get_contour_spectrum(contour_sky,cube,wavelength_range_array):
     flux=np.zeros(len(wavelength_range_array))
     for i in range(cubelet.shape[0]):     
         
-        image_slice = cubelet.unmasked_data[i,:,:]
+        image_slice = cubelet.unmasked_data[i,:,:].value
 
         # apply mask and sum up the flux in channel image
         flux[i] = np.nansum(image_slice[mask])
