@@ -118,8 +118,8 @@ def fit_gauss(x,y):
 
 
 def check_source_gaussian_fit(found_sources_dict,params):
-    sloped_baseline, integrated_image_beam_diameter_list,int_image_length,cube_start,cube_end,data_cube,rsqr_threshold = params
-
+    sloped_baseline, integrated_image_beam_diameter_list,int_image_length,cube_start,cube_end,data_file,rsqr_threshold = params
+    data_cube = SpectralCube.read(data_file)
     for source in range(len(found_sources_dict)):
         x_coord,y_coord = found_sources_dict['x_coord'].values[source],found_sources_dict['y_coord'].values[source]
         int_im_number = found_sources_dict['int_im_number'].values[source]
@@ -173,7 +173,8 @@ def calculate_spectral_SNR(flux_long,flux_central,signal_persistence_threshold):
     return spectral_SNR, spectral_SNR_average
     
     
-def get_beam_spectrum(x_coord,y_coord,integrated_image_beam_diameter,flux_cubelet_start,flux_cubelet_end,cube_start,cube_end,data_cube):
+def get_beam_spectrum(x_coord,y_coord,integrated_image_beam_diameter,flux_cubelet_start,flux_cubelet_end,cube_start,cube_end,data_file):
+    data_cube = SpectralCube.read(data_file)
     if flux_cubelet_start<cube_start: flux_cubelet_start=cube_start
     if flux_cubelet_end>cube_end: flux_cubelet_end=cube_end
 
@@ -201,7 +202,8 @@ def find_sequence(arr,seq):
     M = (arr[np.arange(N_arr-N_seq+1)[:,None] + r_seq] == seq).all(1)
     return M.any()
 
-def check_persistence(x_coord,y_coord,integrated_image_beam_diameter,integrated_image_central_channel,SNR_channel_frame_threshold,signal_persistence_threshold,bg_box_size,int_image_length,cube_start,cube_end,data_cube):
+def check_persistence(x_coord,y_coord,integrated_image_beam_diameter,integrated_image_central_channel,SNR_channel_frame_threshold,signal_persistence_threshold,bg_box_size,int_image_length,cube_start,cube_end,data_file):
+    data_cube = SpectralCube.read(data_file)
     # estimate frame background noise
     if integrated_image_beam_diameter<4:integrated_image_beam_diameter=4
 
@@ -265,8 +267,8 @@ def check_persistence(x_coord,y_coord,integrated_image_beam_diameter,integrated_
 
 
 def check_source_in_spectral(found_sources_dict,params):
-    integrated_image_beam_diameter_array,int_image_length,cube_start,cube_end,data_cube,SNR_spectrum_threshold,SNR_channel_frame_threshold, signal_persistence_threshold,bg_box_size,sloped_baseline = params 
-    
+    integrated_image_beam_diameter_array,int_image_length,cube_start,cube_end,data_file,SNR_spectrum_threshold,SNR_channel_frame_threshold, signal_persistence_threshold,bg_box_size,sloped_baseline = params 
+    data_cube = SpectralCube.read(data_file)
     for source in range(len(found_sources_dict)):
         x_coord,y_coord = found_sources_dict['x_coord'].values[source],found_sources_dict['y_coord'].values[source]
         int_im_number = found_sources_dict['int_im_number'].values[source]
@@ -277,7 +279,7 @@ def check_source_in_spectral(found_sources_dict,params):
         while True:
 
             # check persistence
-            if check_persistence(x_coord,y_coord,integrated_image_beam_diameter,integrated_image_central_channel,SNR_channel_frame_threshold,signal_persistence_threshold,bg_box_size,int_image_length,cube_start,cube_end,data_cube)==False:
+            if check_persistence(x_coord,y_coord,integrated_image_beam_diameter,integrated_image_central_channel,SNR_channel_frame_threshold,signal_persistence_threshold,bg_box_size,int_image_length,cube_start,cube_end,data_file)==False:
                 found_sources_dict['failed_persistence'].values[source] = 1
                 break
             else:
@@ -293,7 +295,7 @@ def check_source_in_spectral(found_sources_dict,params):
             if flux_cubelet_end_full>cube_end: flux_cubelet_end_full=cube_end
             
             channels = np.arange(flux_cubelet_start_full,flux_cubelet_end_full)
-            flux_full = get_beam_spectrum(x_coord,y_coord,integrated_image_beam_diameter,flux_cubelet_start_full,flux_cubelet_end_full,cube_start,cube_end,data_cube)
+            flux_full = get_beam_spectrum(x_coord,y_coord,integrated_image_beam_diameter,flux_cubelet_start_full,flux_cubelet_end_full,cube_start,cube_end,data_file)
 
             
             if sloped_baseline:
@@ -469,10 +471,10 @@ def search_integrated_image(integrated_image,int_im_number, exclusion_zone_radiu
         radiuses = np.sqrt( np.power(found_peaks_x_coord_array-cent_coord[0],2) +  np.power(found_peaks_y_coord_array-cent_coord[1],2)*(image_width/image_height))/(image_width/2)
        
         threshold_for_each_source = median + exp_function(radiuses,*popt_std)*SNR_integrated_image_threshold*0.8
-        above_threshold_mask = (found_peaks_max_value>=threshold_for_each_source)
+        above_threshold_mask = (found_peaks_max_value>=threshold_for_each_source*0)
     
         # calculate SNR
-        initial_SNR = (found_peaks_max_value-median)/exp_function(radiuses,*popt_std)
+        initial_SNR = (found_peaks_max_value-median)/exp_function(radiuses,*popt_std)*0
     
         # filter out sources below threshold
         found_peaks_x_coord_array = found_peaks_x_coord_array[above_threshold_mask]
@@ -578,7 +580,8 @@ def integrate_image(func_input):
     int_im,params = func_input
     cube_slab_number = params[0]
     cube_end = params[1]
-    data_cube = params[2]
+    data_file = params[2]
+    data_cube = SpectralCube.read(data_file)
     cube_start = params[3]
     slab_half_length = params[4]
     #get slab out of the cube
@@ -699,7 +702,7 @@ def source_finder_func(data_file, path_to_results,
         int_im_start = chunk*int_image_load_number
         int_im_end = (chunk+1)*int_image_load_number
         if chunk == chunk_number-1: int_im_end = cube_slab_number
-        params = [cube_slab_number, cube_end,data_cube,cube_start,slab_half_length]
+        params = [cube_slab_number, cube_end,data_file,cube_start,slab_half_length]
         integrated_image_list = p_map(integrate_image,[(int_im,params) for int_im in range(int_im_start,int_im_end)])
         integrated_image_beam_diameter_list = integrated_image_beam_diameter_array[np.arange(int_im_start,int_im_end)]
         
@@ -742,7 +745,7 @@ def source_finder_func(data_file, path_to_results,
             filter_passed = (np.array(all_sources_dict['failed_local_threshold'])==0)
             n_sources = len(all_sources_dict[filter_passed])
             print('checking %s sources in frequency space using %s cores'%(len(all_sources_dict[filter_passed ]),core_number))
-            params = integrated_image_beam_diameter_array,int_image_length,cube_start,cube_end,data_cube,SNR_spectrum_threshold,SNR_channel_frame_threshold,signal_persistence_threshold, bg_box_size,sloped_baseline
+            params = integrated_image_beam_diameter_array,int_image_length,cube_start,cube_end,data_file,SNR_spectrum_threshold,SNR_channel_frame_threshold,signal_persistence_threshold, bg_box_size,sloped_baseline
             spectral_check_results = p_map(check_source_in_spectral,
                                           [all_sources_dict[filter_passed][i*int((n_sources)/core_number+1):(i+1)*int((n_sources)/core_number+1)] for i in range(core_number)],[params for i in range(core_number)],num_cpus=core_number)
             
@@ -761,7 +764,7 @@ def source_finder_func(data_file, path_to_results,
             filter_passed_associated = (np.array(all_sources_dict['failed_spectral_SNR'])==0)&(all_sources_dict['ID'].values==all_sources_dict['associated_with'].values)
             n_sources = len(all_sources_dict[filter_passed_associated])
             print('fitting Gaussian function for %s sources using %s cores'%(n_sources,core_number)) 
-            params = sloped_baseline, integrated_image_beam_diameter_list,int_image_length,cube_start,cube_end,data_cube,rsqr_threshold
+            params = sloped_baseline, integrated_image_beam_diameter_list,int_image_length,cube_start,cube_end,data_file,rsqr_threshold
     
             gaussian_fit_check_results = p_map(check_source_gaussian_fit,
                                           [all_sources_dict[filter_passed_associated][i*int((n_sources)/core_number+1):(i+1)*int((n_sources)/core_number+1)] for i in range(core_number)],[params for i in range(core_number)],num_cpus=core_number)
