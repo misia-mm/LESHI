@@ -13,6 +13,7 @@ from astropy.stats import SigmaClip
 from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord
 from spectral_cube import SpectralCube
+from spectral_cube.utils import SpectralCubeWarning
 
 import matplotlib
 from matplotlib.colors import Normalize
@@ -28,6 +29,8 @@ import warnings
 
 # Convert RuntimeWarning into an exception
 warnings.filterwarnings("error", category=RuntimeWarning)
+warnings.filterwarnings(action='ignore', category=SpectralCubeWarning)
+
 
 # get sky coordinates in degrees from pixel coordinates
 def sky_coord_in_deg_from_pix(x_pix_coord,y_pix_coord,wcs):
