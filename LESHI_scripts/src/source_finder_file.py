@@ -474,10 +474,10 @@ def search_integrated_image(integrated_image,int_im_number, exclusion_zone_radiu
         radiuses = np.sqrt( np.power(found_peaks_x_coord_array-cent_coord[0],2) +  np.power(found_peaks_y_coord_array-cent_coord[1],2)*(image_width/image_height))/(image_width/2)
        
         threshold_for_each_source = median + exp_function(radiuses,*popt_std)*SNR_integrated_image_threshold*0.8
-        above_threshold_mask = (found_peaks_max_value>=threshold_for_each_source*0)
+        above_threshold_mask = (found_peaks_max_value>=threshold_for_each_source)
     
         # calculate SNR
-        initial_SNR = (found_peaks_max_value-median)/exp_function(radiuses,*popt_std)*0
+        initial_SNR = (found_peaks_max_value-median)/exp_function(radiuses,*popt_std)
     
         # filter out sources below threshold
         found_peaks_x_coord_array = found_peaks_x_coord_array[above_threshold_mask]
