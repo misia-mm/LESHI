@@ -51,7 +51,8 @@ def log_likelihood(theta, x, y, yerr):
     model = H + A * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
 
     sigma2 = yerr**2
-    return -0.5 * np.sum((y - model) ** 2 / sigma2 + np.log(sigma2))
+
+    return -0.5 * np.nansum((y - model) ** 2 / sigma2 + np.log(sigma2))
 
 def log_prior(x,theta):
     H, A, x0, sigma = theta
@@ -122,7 +123,6 @@ def fit_gauss(x,y):
 
 def check_source_gaussian_fit(found_sources_dict,params):
     sloped_baseline, integrated_image_beam_diameter_list,int_image_length,cube_start,cube_end,data_file,rsqr_threshold = params
-    data_cube = SpectralCube.read(data_file)
     for source in range(len(found_sources_dict)):
         x_coord,y_coord = found_sources_dict['x_coord'].values[source],found_sources_dict['y_coord'].values[source]
         int_im_number = found_sources_dict['int_im_number'].values[source]
@@ -138,7 +138,7 @@ def check_source_gaussian_fit(found_sources_dict,params):
             flux_cubelet_end = integrated_image_central_channel+half_width
             if flux_cubelet_start<cube_start: flux_cubelet_start=cube_start
             if flux_cubelet_end>cube_end: flux_cubelet_end=cube_end
-            flux = get_beam_spectrum(x_coord,y_coord,integrated_image_beam_diameter,flux_cubelet_start,flux_cubelet_end,cube_start,cube_end,data_cube)
+            flux = get_beam_spectrum(x_coord,y_coord,integrated_image_beam_diameter,flux_cubelet_start,flux_cubelet_end,cube_start,cube_end,data_file)
             
             
             if sloped_baseline:
@@ -474,10 +474,10 @@ def search_integrated_image(integrated_image,int_im_number, exclusion_zone_radiu
         radiuses = np.sqrt( np.power(found_peaks_x_coord_array-cent_coord[0],2) +  np.power(found_peaks_y_coord_array-cent_coord[1],2)*(image_width/image_height))/(image_width/2)
        
         threshold_for_each_source = median + exp_function(radiuses,*popt_std)*SNR_integrated_image_threshold*0.8
-        above_threshold_mask = (found_peaks_max_value>=threshold_for_each_source)
+        above_threshold_mask = (found_peaks_max_value>=threshold_for_each_source*0)
     
         # calculate SNR
-        initial_SNR = (found_peaks_max_value-median)/exp_function(radiuses,*popt_std)
+        initial_SNR = (found_peaks_max_value-median)/exp_function(radiuses,*popt_std)*0
     
         # filter out sources below threshold
         found_peaks_x_coord_array = found_peaks_x_coord_array[above_threshold_mask]
