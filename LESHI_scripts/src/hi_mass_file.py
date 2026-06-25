@@ -101,7 +101,7 @@ def read_in_radio_file(radio_file):
     try:
         try:beam_diameter_arcsec_array = cube.beams.major.value
         except: beam_diameter_arcsec_array = np.array([cube.beam.major.value])
-    except: beam_diameter_arcsec_array = np.array([15])
+    except: beam_diameter_arcsec_array = np.array([25.821923])
         
     return cube, cube_data, wcs_cube, cube_channel_length,dpix, beam_diameter_arcsec_array
 
@@ -131,8 +131,8 @@ def measure_hi_mass(source_data_table_input):
         wavelength_range_array = np.arange(wavelength_range_left,wavelength_range_right,1,dtype=int)
         
         flux = get_contour_spectrum(contour_sky,cube,wavelength_range_array)
-        flux[np.where(wavelength_range_array==source_data_table['z_channel_min'].values[source]):
-            np.where(wavelength_range_array==source_data_table['z_channel_max'].values[source])] = np.median(flux)
+        
+        flux[(wavelength_range_array>=int(source_data_table['z_channel_min'].values[source]))&(wavelength_range_array<=int(source_data_table['z_channel_max'].values[source]))]= np.median(flux)
         baseline_constant = np.polyfit(np.arange(len(flux)), flux, 0)[0]
 
         # measure flux
