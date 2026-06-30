@@ -17,3 +17,6 @@
          Line    Emisssion  Source -   Hunting Integrator
 ```
 Currently under development
+
+It LESHI is used in your work, please cite this paper:
+https://ui.adsabs.harvard.edu/abs/2026MNRAS.tmp.1055M/abstract
