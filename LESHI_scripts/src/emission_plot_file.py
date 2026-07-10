@@ -342,32 +342,32 @@ def wide_spectrum_plot(axspectrumwide,wavelength_range_array_wide,x_coord,y_coor
         #plt.show()
         print(ydata)
         print(flux)
-        print(x_coord,y_coord,sources_dict['x0_busy'].values[source])
+        print(x_coord,y_coord,sources_dict['z_channel_center'].values[source])
         print(wavelength_range_array_wide)
         print(x_coord,y_coord,beam_diameter,wavelength_range_array_wide[0],wavelength_range_array_wide[-1]+1)
     axspectrumwide.set_xlim(np.nanmin(xdata),np.nanmax(xdata))
   
     #axspectrumwide.step(xdata,ydata,color = 'black',alpha=0.45,lw=0.7)
     axspectrumwide.step(xdata,ydata,color = 'black',alpha=0.5,lw=0.75,label='spectrum')
-    busy_fit, fit_xp, fit_xe, fit_a, fit_w, fit_b, fit_c, fit_C = fit_busy(wavelength_range_array_wide,ydata/(bmpix*dfreq),source,sources_dict)
+    # busy_fit, fit_xp, fit_xe, fit_a, fit_w, fit_b, fit_c, fit_C = fit_busy(wavelength_range_array_wide,ydata/(bmpix*dfreq),source,sources_dict)
     
     
-    xdata = np.arange(wavelength_range_array_wide[0],wavelength_range_array_wide[-1]+1,0.2)
-    busy_func = busy(xdata,fit_xp, fit_xe, fit_a, fit_w, fit_b, fit_c, fit_C)*bmpix*dfreq
-    xdata = channel_to_frequency(xdata,data_cube_wcs)/1E6
-    axspectrumwide.plot(xdata,busy_func,color='blue',label='busy function',lw=0.75,alpha=0.9)
+    # xdata = np.arange(wavelength_range_array_wide[0],wavelength_range_array_wide[-1]+1,0.2)
+    # busy_func = busy(xdata,fit_xp, fit_xe, fit_a, fit_w, fit_b, fit_c, fit_C)*bmpix*dfreq
+    # xdata = channel_to_frequency(xdata,data_cube_wcs)/1E6
+    # axspectrumwide.plot(xdata,busy_func,color='blue',label='busy function',lw=0.75,alpha=0.9)
     #axspectrumwide.plot(channel_to_frequency(xdata,data_cube_wcs)/1E6,bmpix*dfreq*gauss(xdata,sources_dict['H'].values[source],sources_dict['A'].values[source],sources_dict['x0'].values[source],sources_dict['sigma'].values[source],),color='blue',label='Gaussian function fit',lw=0.75,alpha=0.9)
-    z_channel = sources_dict['x0_busy'].values[source]
+    z_channel = sources_dict['z_channel_center'].values[source]
 
     try:
         axspectrumwide.axvline(  1420.406/(sources_dict['z_spec'].values+1),color='gray',ls='--',alpha=0.2,lw=1,label='z$_{opt}$')
     except:
         pass
         
-    axspectrumwide.axvline(channel_to_frequency(z_channel+sources_dict['W50'].values[source]/2-0.5,data_cube_wcs)/1E6,color='gray',
-                           ls='--',alpha=0.6,lw=1)
-    axspectrumwide.axvline(channel_to_frequency(z_channel-sources_dict['W50'].values[source]/2+0.5,data_cube_wcs)/1E6,
-                           color='gray',ls='--',alpha=0.6,lw=1,label=r'$W_{50}$')
+    # axspectrumwide.axvline(channel_to_frequency(z_channel+sources_dict['W50'].values[source]/2-0.5,data_cube_wcs)/1E6,color='gray',
+    #                        ls='--',alpha=0.6,lw=1)
+    # axspectrumwide.axvline(channel_to_frequency(z_channel-sources_dict['W50'].values[source]/2+0.5,data_cube_wcs)/1E6,
+    #                        color='gray',ls='--',alpha=0.6,lw=1,label=r'$W_{50}$')
     axspectrumwide.legend(loc='upper right')
     
     return ydata 
@@ -519,7 +519,7 @@ def info_about_target(source_dict,source,axflaginfo, axspecfitinfo, axcoordinfo,
     axcoordinfo.text(0.03,0.9,'DETECTION COORDINATES')
     sky_coords = SkyCoord(source_dict['RA_deg'].values[source],source_dict['Dec_deg'].values[source], frame="fk5", unit="deg")
     x_pix_coord, y_pix_coord = skycoord_to_pixel(sky_coords,data_cube_wcs)
-    axcoordinfo.text(0.03,0.75,'xpix ypix channel: '+str(int(x_pix_coord))+' '+str(int(y_pix_coord))+' '+str(round(source_dict['z_channel'].values[source])))
+    axcoordinfo.text(0.03,0.75,'xpix ypix channel: '+str(int(x_pix_coord))+' '+str(int(y_pix_coord))+' '+str(round(source_dict['z_channel_center'].values[source])))
     
     if sky_coords.dec.dms.d<0: zero_non_zero = '-'
     else: zero_non_zero='+'
@@ -535,25 +535,25 @@ def info_about_target(source_dict,source,axflaginfo, axspecfitinfo, axcoordinfo,
     axcoordinfo.text(0.03,0.05,  'beam diameter: '+str(round(beam_diameter,2))+' arcsec')
 
     
-    # spectral fitting
-    axspecfitinfo.text(0.03,0.9,'HI EMISSION')
+    # # spectral fitting
+    # axspecfitinfo.text(0.03,0.9,'HI EMISSION')
     
-    axspecfitinfo.text(0.03,0.75,r'log(M$_{HI}$/M$_{☉}$) = %s ± %s'%(str(round(source_dict['MHI_prism'].values[source],3)),str(round((source_dict['MHI_prism_error']).values[source],3))))
-    axspecfitinfo.text(0.03,0.65, r'F$_{tot}$ [Jy Hz] = %s ± %s'%(str(round((source_dict['flux_Jy_Hz']).values[source],3)),str(round((source_dict['flux_Jy_Hz_error']).values[source],3))))
-    axspecfitinfo.text(0.03,0.55, r'SNR$_{3D}$ = '+str(round((source_dict['integrated_SNR']).values[source],3)))
-    if (source_dict['confidence_flag']).values[source]==0 and (source_dict['confused_flag']).values[source]==1: axspecfitinfo.text(0.03,0.05, 'confident detection, confused source')
-    elif (source_dict['confidence_flag']).values[source]==1 and (source_dict['blended_flag']).values[source]==0: axspecfitinfo.text(0.03,0.05, 'not confident detection, single source')
-    elif (source_dict['confidence_flag']).values[source]==1 and (source_dict['blended_flag']).values[source]==1: axspecfitinfo.text(0.03,0.05, 'not confident detection, blended source')
-    elif (source_dict['confidence_flag']).values[source]==0 and (source_dict['blended_flag']).values[source]==0: axspecfitinfo.text(0.03,0.05, 'confident detection, single source')
-    elif (source_dict['confidence_flag']).values[source]==0 and (source_dict['blended_flag']).values[source]==1: axspecfitinfo.text(0.03,0.05, 'confident detection, blended source')
+    # axspecfitinfo.text(0.03,0.75,r'log(M$_{HI}$/M$_{☉}$) = %s ± %s'%(str(round(source_dict['MHI_prism'].values[source],3)),str(round((source_dict['MHI_prism_error']).values[source],3))))
+    # axspecfitinfo.text(0.03,0.65, r'F$_{tot}$ [Jy Hz] = %s ± %s'%(str(round((source_dict['flux_Jy_Hz']).values[source],3)),str(round((source_dict['flux_Jy_Hz_error']).values[source],3))))
+    # axspecfitinfo.text(0.03,0.55, r'SNR$_{3D}$ = '+str(round((source_dict['integrated_SNR']).values[source],3)))
+    # if (source_dict['confidence_flag']).values[source]==0 and (source_dict['confused_flag']).values[source]==1: axspecfitinfo.text(0.03,0.05, 'confident detection, confused source')
+    # elif (source_dict['confidence_flag']).values[source]==1 and (source_dict['blended_flag']).values[source]==0: axspecfitinfo.text(0.03,0.05, 'not confident detection, single source')
+    # elif (source_dict['confidence_flag']).values[source]==1 and (source_dict['blended_flag']).values[source]==1: axspecfitinfo.text(0.03,0.05, 'not confident detection, blended source')
+    # elif (source_dict['confidence_flag']).values[source]==0 and (source_dict['blended_flag']).values[source]==0: axspecfitinfo.text(0.03,0.05, 'confident detection, single source')
+    # elif (source_dict['confidence_flag']).values[source]==0 and (source_dict['blended_flag']).values[source]==1: axspecfitinfo.text(0.03,0.05, 'confident detection, blended source')
     
-    axflaginfo.text(0.03,0.9,'HI SPECTRAL PROFILE')
-    dv = dfreq/source_dict['frequency_Hz'].values[source]*300000
-    axflaginfo.text(0.03,0.75,r'W$_{50}$ [km/s] = '+str(round((source_dict['W50']).values[source]*dv,3))+'±'+str(round((source_dict['W50_error']).values[source]*dv,3)))
-    axflaginfo.text(0.03,0.65,r'W$_{50}$ [channels] = '+str(round((source_dict['W50']).values[source],2)) +'±'+str(round((source_dict['W50_error']).values[source],2)) )
-    axflaginfo.text(0.03,0.55,r'W$_{100}$ [km/s] = '+str(round((source_dict['W100']).values[source]*dv,3))+'±'+str(round((source_dict['W100_error']).values[source]*(source_dict['dv']).values[source],3))) 
-    axflaginfo.text(0.03,0.45,r'W$_{100}$ [channels] = '+str(round((source_dict['W100']).values[source],2))+'±'+str(round((source_dict['W100_error']).values[source],2)) )
-    axflaginfo.text(0.03,0.35,r'Δv$_{channel}$ [km/s] = '+str(round(dv,1)) )
+    # axflaginfo.text(0.03,0.9,'HI SPECTRAL PROFILE')
+    # dv = dfreq/source_dict['frequency_Hz'].values[source]*300000
+    # axflaginfo.text(0.03,0.75,r'W$_{50}$ [km/s] = '+str(round((source_dict['W50']).values[source]*dv,3))+'±'+str(round((source_dict['W50_error']).values[source]*dv,3)))
+    # axflaginfo.text(0.03,0.65,r'W$_{50}$ [channels] = '+str(round((source_dict['W50']).values[source],2)) +'±'+str(round((source_dict['W50_error']).values[source],2)) )
+    # axflaginfo.text(0.03,0.55,r'W$_{100}$ [km/s] = '+str(round((source_dict['W100']).values[source]*dv,3))+'±'+str(round((source_dict['W100_error']).values[source]*(source_dict['dv']).values[source],3))) 
+    # axflaginfo.text(0.03,0.45,r'W$_{100}$ [channels] = '+str(round((source_dict['W100']).values[source],2))+'±'+str(round((source_dict['W100_error']).values[source],2)) )
+    # axflaginfo.text(0.03,0.35,r'Δv$_{channel}$ [km/s] = '+str(round(dv,1)) )
     
 
 def read_in_radio_file(radio_file):
@@ -587,8 +587,8 @@ def make_plot(sources_dict):
         ra, dec = (sources_dict['RA_deg'].values)[source], (sources_dict['Dec_deg'].values)[source]
         sky_coords =SkyCoord(ra, dec, unit="deg",frame="fk5")
         x_pix_coord, y_pix_coord = skycoord_to_pixel(sky_coords,data_cube_wcs)
-        z_channel, sigma =  (sources_dict['x0_busy'].values)[source], ((sources_dict['half_width'].values)[source])/2
-        if (sources_dict['x0_busy'].values)[source]==-99: z_channel = (sources_dict['gauss_x0'].values)[source]
+        z_channel, sigma =  (sources_dict['z_channel_center'].values)[source], ((sources_dict['z_channel_max'].values)[source]-(sources_dict['z_channel_min'].values)[source])/4
+        if (sources_dict['z_channel_center'].values)[source]==-99: z_channel = (sources_dict['gauss_x0'].values)[source]
         x_pix_coord,y_pix_coord,z_channel  = int(x_pix_coord),int(y_pix_coord),int(z_channel)
         
         image_pixel_width = int(sources_dict['contour_diameter_arc'].values[source]*2/dpix)
@@ -596,7 +596,7 @@ def make_plot(sources_dict):
         if image_pixel_width<image_pixel_width_min: image_pixel_width = image_pixel_width_min
         image_arc_width = image_pixel_width*dpix
         
-        spectrum_length = sources_dict['half_width'].values[source]*2*6
+        spectrum_length = sigma*4*6
         if spectrum_length<spectrum_length_min: spectrum_length = spectrum_length_min
         
         
