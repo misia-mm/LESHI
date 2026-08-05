@@ -148,12 +148,16 @@ def check_source_gaussian_fit(found_sources_dict,params):
             channels=np.arange(flux_cubelet_start,flux_cubelet_end,1)
             
             # check spectrum
-            found_sources_dict['rsqr'].values[source],found_sources_dict['gauss_x0'].values[source],found_sources_dict['gauss_sigma'].values[source], found_sources_dict['gauss_A'].values[source], found_sources_dict['gauss_H'].values[source] = fit_gauss(channels,flux)
+            found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('rsqr')], \
+            found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('gauss_x0')], \
+            found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('gauss_sigma')], \
+            found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('gauss_A')], \
+            found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('gauss_H')] = fit_gauss(channels,flux)
             
             if found_sources_dict['rsqr'].values[source]<rsqr_threshold:
-                found_sources_dict['failed_spectral_fit'].values[source] = 1
+                found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('failed_spectral_fit')] = 1
             else:
-                found_sources_dict['failed_spectral_fit'].values[source] = 0
+                found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('failed_spectral_fit')] = 0
                 
             break
     
@@ -283,10 +287,10 @@ def check_source_in_spectral(found_sources_dict,params):
 
             # check persistence
             if check_persistence(x_coord,y_coord,integrated_image_beam_diameter,integrated_image_central_channel,SNR_channel_frame_threshold,signal_persistence_threshold,bg_box_size,int_image_length,cube_start,cube_end,data_file)==False:
-                found_sources_dict['failed_persistence'].values[source] = 1
+                found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('failed_persistence')] = 1
                 break
             else:
-                found_sources_dict['failed_persistence'].values[source] = 0
+                found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('failed_persistence')] = 0
 
             # check spectral SNR
             # get spectrum for beam pixels around source
@@ -336,14 +340,14 @@ def check_source_in_spectral(found_sources_dict,params):
             spectral_SNR_1, spectral_SNR_average_1 = calculate_spectral_SNR(flux_long,flux_central,signal_persistence_threshold)
             spectral_SNR_2, spectral_SNR_average_2 = calculate_spectral_SNR(flux_medium,flux_central,signal_persistence_threshold)
             spectral_SNR = np.max([spectral_SNR_1,spectral_SNR_2])
-            found_sources_dict['spectral_SNR'].values[source] = spectral_SNR
+            found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('spectral_SNR')] = spectral_SNR
             
             if (spectral_SNR>SNR_spectrum_threshold and spectral_SNR_average_2>0.8*SNR_spectrum_threshold) or (spectral_SNR>SNR_spectrum_threshold and spectral_SNR_average_1>0.8*SNR_spectrum_threshold):
             # if (spectral_SNR>SNR_spectrum_threshold and spectral_SNR_average>0.9*SNR_spectrum_threshold):
-                found_sources_dict['failed_spectral_SNR'].values[source] = 0
+                found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('failed_spectral_SNR')] = 0
                 
             else:
-                found_sources_dict['failed_spectral_SNR'].values[source] = 1
+                found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('failed_spectral_SNR')] = 1
                 
             break
     return found_sources_dict
@@ -359,7 +363,7 @@ def associate_sources(found_sources_dict,params):
                             (found_sources_dict['y_coord'].values[source] - found_sources_dict['y_coord'].values)**2)
             dist_channel = np.absolute(found_sources_dict['int_im_channel'].values[source]-found_sources_dict['int_im_channel'].values)
             match_id = np.arange(0,len(found_sources_dict))[(dist<beam_diameter/4)&(dist_channel<=int_image_length/2)]
-            found_sources_dict['associated_with'].values[source] = found_sources_dict['ID'].values[match_id[np.argmax(found_sources_dict['spectral_SNR'].values[match_id])]]     
+            found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('associated_with')] = found_sources_dict['ID'].values[match_id[np.argmax(found_sources_dict['spectral_SNR'].values[match_id])]]     
     return found_sources_dict
 
 def associate_sources_final(found_sources_dict,max_dist_pix,max_dist_channel):
@@ -369,7 +373,7 @@ def associate_sources_final(found_sources_dict,max_dist_pix,max_dist_channel):
                         (found_sources_dict['y_coord'].values[source] - found_sources_dict['y_coord'].values)**2)
         dist_channel = np.absolute(found_sources_dict['gauss_x0'].values[source]-found_sources_dict['gauss_x0'].values)
         match_id = np.arange(0,len(found_sources_dict))[(dist<max_dist_pix)&(dist_channel<=max_dist_channel)]
-        found_sources_dict['associated_with'].values[source] = found_sources_dict['ID'].values[match_id[np.argmax(found_sources_dict['spectral_SNR'].values[match_id])]]     
+        found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('associated_with')] = found_sources_dict['ID'].values[match_id[np.argmax(found_sources_dict['spectral_SNR'].values[match_id])]]     
     return found_sources_dict
 
 def local_background(x_coord,y_coord,integrated_image,bg_box_size):
@@ -436,12 +440,12 @@ def check_source_on_integrated_image(found_sources_dict,SNR_integrated_image_thr
                 int_SNR, passed_local_threshold = check_local_background(x_coord,y_coord,max_value,
                                                                          integrated_image,integrated_image_beam_diameter,
                                                                          SNR_integrated_image_threshold,bg_box_size)
-                found_sources_dict['int_SNR'].values[source] = int_SNR
+                found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('int_SNR')] = int_SNR
                 if not passed_local_threshold:
-                    found_sources_dict['failed_local_threshold'].values[source] = 1
+                    found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('failed_local_threshold')]= 1
                     break
-                else: found_sources_dict['failed_local_threshold'].values[source] = 0
-            else: found_sources_dict['failed_local_threshold'].values[source] = 0
+                else: found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('failed_local_threshold')] = 0
+            else: found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('failed_local_threshold')] = 0
             
             break
     return found_sources_dict
@@ -493,8 +497,9 @@ def search_integrated_image(integrated_image,int_im_number, exclusion_zone_radiu
                         'x_coord':found_peaks_x_coord_array,'y_coord':found_peaks_y_coord_array,
                        'int_im_number':np.ones(number_of_sources)*int_im_number,
                        'int_im_channel':np.ones(number_of_sources)*central_channel,
-                       'int_initial_SNR':initial_SNR,'int_max_value':found_peaks_max_value,'int_SNR':-99*np.ones(number_of_sources),
-                       'spectral_SNR':-99*np.ones(number_of_sources),'rsqr':-99*np.ones(number_of_sources),
+                       'int_initial_SNR':initial_SNR,'int_max_value':found_peaks_max_value,
+                       'int_SNR':-99*np.ones(number_of_sources),'spectral_SNR':-99*np.ones(number_of_sources),
+                       'rsqr':-99*np.ones(number_of_sources),
                        'gauss_x0':-99*np.ones(number_of_sources),'gauss_sigma':-99*np.ones(number_of_sources), 
                        'gauss_A':-99*np.ones(number_of_sources),'gauss_H':-99*np.ones(number_of_sources),
                       'failed_beamsize':-99*np.ones(number_of_sources), 'failed_local_threshold':-99*np.ones(number_of_sources),
