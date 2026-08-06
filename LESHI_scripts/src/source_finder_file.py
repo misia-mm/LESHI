@@ -164,7 +164,7 @@ def check_source_gaussian_fit(found_sources_dict,params):
                 found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('gauss_x0')], \
                 found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('gauss_sigma')], \
                 found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('gauss_A')], \
-                found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('gauss_H')]  = 0,integrated_image_central_channel,0,0,0
+                found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('gauss_H')]  = -999,integrated_image_central_channel,0,0,0
             
             if found_sources_dict['rsqr'].values[source]<rsqr_threshold:
                 found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('failed_spectral_fit')] = 1
