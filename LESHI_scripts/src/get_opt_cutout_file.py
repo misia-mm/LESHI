@@ -12,7 +12,9 @@ def get_LS_image(ID_array,ra_array,dec_array,width_arc_array, filters,path_to_da
         dec = round(dec_array[source],4) # coordinates of the cutout
         width_arc = width_arc_array[source]
         semi_width_deg = round(width_arc/3600/2,6)
-        size = width_arc/0.26
+        pixscale=0.26
+        size = width_arc/pixscale
+        
         if size>3000:
             size=3000
             pixscale = width_arc/3000
@@ -20,7 +22,7 @@ def get_LS_image(ID_array,ra_array,dec_array,width_arc_array, filters,path_to_da
         for photo_filter in filters:
             # formulate the link from which wget will download the image, the link depends on the coordinates and size of the cutout, for example:
             #       'http://www.legacysurvey.org/viewer/fits-cutout?ra=3.5167&dec=-23.1827&layer=ls-dr10&pixscale=0.262&size=5000&bands=g'
-            link = 'http://www.legacysurvey.org/viewer/fits-cutout?ra=%&dec=%&layer=ls-dr10&pixscale=%s&size=%s&bands=%s'%(ra,dec,pixscale,size,photo_filter)
+            link = 'http://www.legacysurvey.org/viewer/fits-cutout?ra=%s&dec=%s&layer=ls-dr10&pixscale=%s&size=%s&bands=%s'%(ra,dec,pixscale,size,photo_filter)
                    
             # formulate the file name in which wget will save the file, for example:
             # G_image_cutout_ID.fits
@@ -32,7 +34,7 @@ def get_LS_image(ID_array,ra_array,dec_array,width_arc_array, filters,path_to_da
                os.makedirs('%s/LS_images_filter_%s'%(path_to_data,photo_filter))
     
             # download the images
-            os.system('wget --no-verbose -O %s "%s"'%(file_name,username,password,link))       
+            os.system('wget --no-verbose -O %s "%s"'%(file_name,link))       
         print('Finished dowloading cutouts')
 
 
