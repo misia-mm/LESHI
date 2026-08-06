@@ -98,19 +98,20 @@ def contour_to_mask(contour_points,shape):
     return mask
 
 
-def moment_0_map(xpix,ypix,zchannel_left,zchannel_right,map_size,cube,cube_data,cube_channel_length):
-    
+def moment_0_map(xpix,ypix,zchannel_left,zchannel_right,map_size,data_file):
+    cube = SpectralCube.read(data_file)
+
     if zchannel_left<0:zchannel_left=0
-    if zchannel_right>cube_channel_length: zchannel_right = -1
+    if zchannel_right>cube.shape[0]: zchannel_right = -1
     zchannel_left, zchannel_right = int(zchannel_left), int(zchannel_right)
     
     ypix_left, ypix_right = int(ypix-(map_size/2)), int(ypix+(map_size/2))
     if ypix_left<0: ypix_left=0
-    if ypix_right>cube_data.shape[1]: ypix_right = -1
+    if ypix_right>cube.shape[1]: ypix_right = -1
         
     xpix_left, xpix_right = int(xpix-(map_size/2)), int(xpix+(map_size/2))
     if xpix_left<0: xpix_left=0
-    if xpix_right>cube_data.shape[2]: xpix_right = -1
+    if xpix_right>cube.shape[2]: xpix_right = -1
 
     cubelet=cube[zchannel_left:zchannel_right,ypix_left:ypix_right,xpix_left:xpix_right]
     
@@ -121,8 +122,8 @@ def moment_0_map(xpix,ypix,zchannel_left,zchannel_right,map_size,cube,cube_data,
     
     return moment_0, mean, median, std, wcs_moment_0
 
-def get_contour_spectrum(contour_sky,cube,wavelength_range_array):
-    
+def get_contour_spectrum(contour_sky,data_file,wavelength_range_array):
+    cube = SpectralCube.read(data_file)
     ra_max,dec_max = np.nanmax(contour_sky.T[0]),np.nanmax(contour_sky.T[1])
     ra_min,dec_min = np.nanmin(contour_sky.T[0]),np.nanmin(contour_sky.T[1])
     x_pix_max, y_pix_max = skycoord_to_pixel(SkyCoord(ra_max,dec_max, frame="fk5", unit="deg"),cube.wcs)
@@ -162,16 +163,15 @@ def get_contour_spectrum(contour_sky,cube,wavelength_range_array):
 
 def read_in_radio_file(radio_file):
     cube=SpectralCube.read(radio_file)
-    cube_data = cube.unmasked_data[:,:,:].value
     wcs_cube = cube.wcs
-    cube_channel_length = cube_data.shape[0]
+    cube_channel_length = cube.shape[0]
     dpix=np.abs(wcs_cube.wcs.cdelt[0])*3600
     try:
         try:beam_diameter_arcsec_array = cube.beams.major.value
         except: beam_diameter_arcsec_array = np.array([cube.beam.major.value])
     except: beam_diameter_arcsec_array = np.array([15])
         
-    return cube, cube_data, wcs_cube, cube_channel_length,dpix, beam_diameter_arcsec_array
+    return cube, wcs_cube, cube_channel_length,dpix, beam_diameter_arcsec_array
 
 
 
@@ -241,7 +241,7 @@ def log_likelihood_busy(theta, x, y, yerr):
     
     return -0.5 * np.sum((y - model) ** 2 / sigma2 + np.log(sigma2))
 
-def log_prior_busy(x,theta):
+def log_prior_busy(x,theta,cube_channel_length):
     xp, xe, a, w, b, c, C = theta
  
     if a>0 and 2*len(x)>w>=0 and 10>b>=0.1 and c>=0 and 0<xp<cube_channel_length-1 and 0<xe<cube_channel_length-1 :
@@ -249,8 +249,8 @@ def log_prior_busy(x,theta):
 
     return -np.inf
 
-def log_probability_busy(theta, x, y, yerr):
-    lp = log_prior_busy(x,theta)
+def log_probability_busy(theta, x, y, yerr,cube_channel_length):
+    lp = log_prior_busy(x,theta,cube_channel_length)
     if not np.isfinite(lp):
         return -np.inf
     return lp + log_likelihood_busy(theta, x, y, yerr)
@@ -270,7 +270,7 @@ def busy(x, xp, xe, a, w, b, c, C):
 # a and c in tandem control how deep the central through is
 # b - slope of the peaks, b>0
 
-def fit_busy(x,y,initial_params):
+def fit_busy(x,y,initial_params,cube_channel_length):
     # starting parameters
     if initial_params[0]>cube_channel_length-2:
         initial_params[0] = cube_channel_length-3
@@ -287,7 +287,7 @@ def fit_busy(x,y,initial_params):
     mean, median, yerr = sigma_clipped_stats(y, sigma=3,maxiters=None)
     if yerr==0: yerr=0.0001
     try:
-        sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability_busy, args=(x, y, yerr))
+        sampler = emcee.EnsembleSampler(nwalkers, ndim, log_probability_busy, args=(x, y, yerr,cube_channel_length))
         sampler.run_mcmc(pos, 2000, progress=False)
     
         flat_samples = sampler.get_chain(discard=200, thin=10, flat=True)
@@ -305,7 +305,7 @@ def fit_busy(x,y,initial_params):
         fit_C = flat_samples[i, 6]
         
         theta = [fit_xp,fit_xe,fit_a,fit_w,fit_b,fit_c,fit_C]
-        log_prob_array[i] = log_probability_busy(theta, x, y, yerr)
+        log_prob_array[i] = log_probability_busy(theta, x, y, yerr, cube_channel_length)
     fit_xp = flat_samples[np.argmax(log_prob_array), 0]
     fit_xe = flat_samples[np.argmax(log_prob_array), 1]
     fit_a = flat_samples[np.argmax(log_prob_array), 2]
@@ -316,7 +316,8 @@ def fit_busy(x,y,initial_params):
 
     
 
-    W50_channels, W100_channels, x0_channels, zmin, zmax = calculate_velocity_widths(x,fit_xp, fit_xe, fit_a, fit_w, fit_b, fit_c, fit_C, yerr)
+    W50_channels, W100_channels, x0_channels, zmin, zmax = \
+    calculate_velocity_widths(x,fit_xp, fit_xe, fit_a, fit_w, fit_b, fit_c, fit_C, yerr)
     half_width = (W100_channels/2)
 
     
@@ -327,10 +328,12 @@ def fit_busy(x,y,initial_params):
     # print('Rsqr: ',rsqr)
     return rsqr, fit_y, fit_xp, fit_xe, fit_a, fit_w, fit_b, fit_c, fit_C, x0_channels, half_width, zmin, zmax
 
-def find_source_extent(source_data_table_input):
+def find_source_extent(source_data_table_input,path_to_radio_file,path_to_results,initial_map_size_pix,min_diameter_pix):
     global source_data_table
     source_data_table = source_data_table_input
 
+    cube, wcs_cube, cube_channel_length, dpix, beam_diameter_arcsec_array =read_in_radio_file(path_to_radio_file)
+    
     try: a = source_data_table['x_pix_center'].values
     except:
         source_data_table = source_data_table.assign(x_pix_center = np.ones(len(source_data_table))*(-99),
@@ -365,7 +368,7 @@ def find_source_extent(source_data_table_input):
     
         wavelength_range_left, wavelength_range_right = z_channel-200, z_channel+200
         if wavelength_range_left<0: wavelength_range_left=2
-        if wavelength_range_right>= cube_data.shape[0] : wavelength_range_right = cube_data.shape[0] -2
+        if wavelength_range_right>= cube.shape[0] : wavelength_range_right = cube.shape[0] -2
         wavelength_range_array = np.arange(wavelength_range_left,wavelength_range_right,1,dtype=int)
     
         loop = 0
@@ -387,13 +390,13 @@ def find_source_extent(source_data_table_input):
             if loop>20:
                 
                 fail_flag=1
-                source_data_table['contour_flag'].values[source] = fail_flag
+                source_data_table.iloc[source,source_data_table.columns.get_loc('contour_flag')]= fail_flag
                 #print('loop fail for contour %s - kept last values of parameters'%(source_data_table['ID'].values[source]))
                 break
                 
             contour_found=False
             
-            moment_0, mean, median, std, wcs_moment_0 = moment_0_map(x_pix,y_pix,zmin,zmax,map_size_pix,cube,cube_data,cube_channel_length)
+            moment_0, mean, median, std, wcs_moment_0 = moment_0_map(x_pix,y_pix,zmin,zmax,map_size_pix,path_to_radio_file)
             x_pix_moment_0, y_pix_moment_0 = skycoord_to_pixel(SkyCoord(ra,dec, frame="fk5", unit="deg"),wcs_moment_0)
             moment_0 = np.nan_to_num(moment_0)
             threshold_value = median + 3*std
@@ -415,16 +418,16 @@ def find_source_extent(source_data_table_input):
                     contour_found=True
             if not contour_found:
                 fail_flag=1
-                source_data_table['contour_flag'].values[source] = fail_flag
+                source_data_table.iloc[source,source_data_table.columns.get_loc('contour_flag')] = fail_flag
                 zmin,zmax = x0-int(2*sigma),x0+int(2*sigma)
                 x0=z_channel
                 continue
                 
             mask = contour_to_mask(source_contour,moment_0.shape)
             contour_sky = contour_sky_coord_in_deg_from_pix(source_contour,wcs_moment_0)
-            flux = get_contour_spectrum(contour_sky,cube,wavelength_range_array)
+            flux = get_contour_spectrum(contour_sky,path_to_radio_file,wavelength_range_array)
             
-            rsqr, fit_y, fit_xp, fit_xe, fit_a, fit_w, fit_b, fit_c, fit_C, x0, half_width, zmin, zmax = fit_busy(wavelength_range_array,flux,initial_params)
+            rsqr, fit_y, fit_xp, fit_xe, fit_a, fit_w, fit_b, fit_c, fit_C, x0, half_width, zmin, zmax = fit_busy(wavelength_range_array,flux,initial_params,cube_channel_length)
             
                 
     
@@ -442,7 +445,7 @@ def find_source_extent(source_data_table_input):
             # break the loop if the value converges
             if (contour_size[-1]*0.95<len(mask[mask==True])<contour_size[-1]*1.05 and contour_size[-2]*0.95<len(mask[mask==True])<contour_size[-2]*1.05 and contour_size[-3]*0.95<len(mask[mask==True])<contour_size[-3]*1.05) or (contour_size[-2]*0.95<len(mask[mask==True])<contour_size[-2]*1.05 and contour_size[-4]*0.95<len(mask[mask==True])<contour_size[-4]*1.05):
                 fail_flag=0
-                source_data_table['contour_flag'].values[source] = 0
+                source_data_table.iloc[source,source_data_table.columns.get_loc('contour_flag')] = 0
                 break
             contour_size.append(len(mask[mask==True]))
 
@@ -454,10 +457,10 @@ def find_source_extent(source_data_table_input):
             if spectrum_half_length<200: spectrum_half_length=200
             wavelength_range_left, wavelength_range_right = x0-spectrum_half_length, x0+spectrum_half_length
             if wavelength_range_left<0: wavelength_range_left=2
-            if wavelength_range_right> cube_data.shape[0]-1 : wavelength_range_right = cube_data.shape[0] -1
+            if wavelength_range_right> cube.shape[0]-1 : wavelength_range_right = cube.shape[0] -1
             wavelength_range_array = np.arange(wavelength_range_left,wavelength_range_right,1,dtype=int)
 
-            if x0> cube_data.shape[0]-1: x0 = cube_data.shape[0]-1
+            if x0> cube.shape[0]-1: x0 = cube.shape[0]-1
             if half_width<1: half_width=1
 
         if fail_flag==0:contour_diameter_pix = contour_diameter(source_contour)
@@ -477,14 +480,15 @@ def find_source_extent(source_data_table_input):
             map_size_pix = initial_map_size_pix
             wavelength_range_left, wavelength_range_right = z_channel-200, z_channel+200
             if wavelength_range_left<0: wavelength_range_left=2
-            if wavelength_range_right>= cube_data.shape[0] : wavelength_range_right = cube_data.shape[0] -2
+            if wavelength_range_right>= cube.shape[0] : wavelength_range_right = cube.shape[0] -2
             wavelength_range_array = np.arange(wavelength_range_left,wavelength_range_right,1,dtype=int)
             initial_params = [z_channel,z_channel,1,10,np.sqrt(np.pi/2)/sigma,1e-4*1.1,gauss_H]
             if initial_params[4]>=100: initial_params[4] = 99
 
-        flux = get_contour_spectrum(contour_sky,cube,wavelength_range_array)
-        rsqr, fit_y, fit_xp, fit_xe, fit_a, fit_w, fit_b, fit_c, fit_C, x0, half_width, zmin, zmax = fit_busy(wavelength_range_array,flux,initial_params)
-        moment_0, mean, median, std, wcs_moment_0 = moment_0_map(x_pix,y_pix,zmin,zmax,map_size_pix,cube,cube_data,cube_channel_length)
+        flux = get_contour_spectrum(contour_sky,path_to_radio_file,wavelength_range_array)
+        rsqr, fit_y, fit_xp, fit_xe, fit_a, fit_w, fit_b, fit_c, fit_C, x0, half_width, zmin, zmax =\
+        fit_busy(wavelength_range_array,flux,initial_params,cube_channel_length)
+        moment_0, mean, median, std, wcs_moment_0 = moment_0_map(x_pix,y_pix,zmin,zmax,map_size_pix,path_to_radio_file)
         source_contour = contour_coord_in_pix_from_deg(contour_sky,wcs_moment_0)
         
         if zmax-zmin < 2:
@@ -494,16 +498,21 @@ def find_source_extent(source_data_table_input):
         new_frequency = channel_to_frequency(x0,wcs_cube)
         new_z = (1420405000-new_frequency)/new_frequency
 
-        source_data_table['frequency_Hz'].values[source],source_data_table['redshift'].values[source] = new_frequency, new_z
+        source_data_table.iloc[source,source_data_table.columns.get_loc('frequency_Hz')] = new_frequency
+        source_data_table.iloc[source,source_data_table.columns.get_loc('redshift')] = new_z
         contour_diameter_pix = contour_diameter(source_contour)
-        source_data_table['contour_diameter_arc'].values[source] = contour_diameter_pix*dpix
+        source_data_table.iloc[source,source_data_table.columns.get_loc('contour_diameter_arc')] = \
+        contour_diameter_pix*dpix
 
-        source_data_table['RA_deg'].values[source],source_data_table['Dec_deg'].values[source] = sky_coord_in_deg_from_pix(x_pix,y_pix,wcs_cube)
-        source_data_table['x_pix_center'].values[source], source_data_table['y_pix_center'].values[source] = x_pix, y_pix
+        source_data_table.iloc[source,source_data_table.columns.get_loc('RA_deg')], \
+        source_data_table.iloc[source,source_data_table.columns.get_loc('Dec_deg')] = \
+        sky_coord_in_deg_from_pix(x_pix,y_pix,wcs_cube)
+        source_data_table.iloc[source,source_data_table.columns.get_loc('x_pix_center')] = x_pix
+        source_data_table.iloc[source,source_data_table.columns.get_loc('y_pix_center')] = y_pix
         
-        source_data_table['z_channel_center'].values[source] = int(x0)
-        source_data_table['z_channel_min'].values[source] = int(zmin)
-        source_data_table['z_channel_max'].values[source] = int(zmax)
+        source_data_table.iloc[source,source_data_table.columns.get_loc('z_channel_center')] = int(x0)
+        source_data_table.iloc[source,source_data_table.columns.get_loc('z_channel_min')] = int(zmin)
+        source_data_table.iloc[source,source_data_table.columns.get_loc('z_channel_max')] = int(zmax)
 
         if not os.path.exists(path_to_results+'contours'):
             os.makedirs(path_to_results+'contours')
@@ -519,12 +528,14 @@ def find_source_extent(source_data_table_input):
             x_pix_min, x_pix_max = x_pix_max, x_pix_min
         if y_pix_min>y_pix_max:
             y_pix_min, y_pix_max = y_pix_max, y_pix_min
-        source_data_table['x_pix_min'].values[source], source_data_table['y_pix_min'].values[source] = int(x_pix_min), int(y_pix_min)
-        source_data_table['x_pix_max'].values[source], source_data_table['y_pix_max'].values[source] = int(x_pix_max), int(y_pix_max)
+        source_data_table.iloc[source,source_data_table.columns.get_loc('x_pix_min')] = int(x_pix_min)
+        source_data_table.iloc[source,source_data_table.columns.get_loc('y_pix_min')] = int(y_pix_min)
+        source_data_table.iloc[source,source_data_table.columns.get_loc('x_pix_max')] = int(x_pix_max)
+        source_data_table.iloc[source,source_data_table.columns.get_loc('y_pix_max')] = int(y_pix_max)
             
         # plot quick plots
-        if not os.path.exists(path_to_results+'/extent_quick_plots'):
-            os.makedirs(path_to_results+'/extent_quick_plots')
+        if not os.path.exists(path_to_results+'/source_extent_quick_plots'):
+            os.makedirs(path_to_results+'/source_extent_quick_plots')
         fig = plt.figure(figsize=(15,5))
         fig.suptitle(source_data_table['ID'].values[source], fontsize=16)
 
@@ -553,25 +564,30 @@ def find_source_extent(source_data_table_input):
         else:
             ax[1].set_xlim(x0-4*half_width,x0+4*half_width)
            
-        fig.savefig(path_to_results+'/extent_quick_plots/'+"%s_plot.jpg"%(source_data_table['ID'].values[source]))
+        fig.savefig(path_to_results+'/source_extent_quick_plots/'+"%s_plot.jpg"%(source_data_table['ID'].values[source]))
                 
     return source_data_table
 
-def associate_sources_final(found_sources_dict):
+def associate_sources_final(found_sources_dict,path_to_radio_file):
+    cube, wcs_cube, cube_channel_length, dpix, beam_diameter_arcsec_array =read_in_radio_file(path_to_radio_file)
     found_sources_dict['associated_with'] = np.full(len(found_sources_dict),'no_match_yet')
     for source in range(len(found_sources_dict)):
         dist = np.sqrt( (found_sources_dict['x_pix_center'].values[source] - found_sources_dict['x_pix_center'].values)**2 +
                         (found_sources_dict['y_pix_center'].values[source] - found_sources_dict['y_pix_center'].values)**2)
-        dist_channel = np.absolute(found_sources_dict['z_channel_center'].values[source]-found_sources_dict['z_channel_center'].values)
+        dist_channel = np.absolute(found_sources_dict['z_channel_center'].values[source]- \
+                                   found_sources_dict['z_channel_center'].values)
         match_id = np.arange(0,len(found_sources_dict))[(dist<found_sources_dict['contour_diameter_arc'].values[source]/3/dpix)&(dist_channel<=(found_sources_dict['z_channel_max'].values[source]-found_sources_dict['z_channel_min'].values[source])/2)]
-        found_sources_dict['associated_with'].values[source] = found_sources_dict['ID'].values[match_id[np.argmax(found_sources_dict['z_channel_center'].values[match_id])]]     
+        found_sources_dict['associated_with'].values[source] 
+        found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('associated_with')]= \
+        found_sources_dict['ID'].values[match_id[np.argmax(found_sources_dict['z_channel_center'].values[match_id])]]     
     return found_sources_dict
 
-def source_extent_script(data_table, path_to_radio_file, initial_map_size_pix_input, min_diameter_arc_input,path_to_results_input,core_no_input ):
-    global cube, cube_data, wcs_cube, cube_channel_length, initial_map_size_pix, dpix, path_to_results, min_diameter_pix, beam_diameter_arcsec_array
+def source_extent_script(data_table, path_to_radio_file, initial_map_size_pix_input,\
+                         min_diameter_arc_input,path_to_results_input,core_no_input ):
+    
     initial_map_size_pix = initial_map_size_pix_input
     path_to_results = path_to_results_input
-    cube, cube_data, wcs_cube, cube_channel_length, dpix, beam_diameter_arcsec_array =read_in_radio_file(path_to_radio_file)
+    cube, wcs_cube, cube_channel_length, dpix, beam_diameter_arcsec_array =read_in_radio_file(path_to_radio_file)
     if min_diameter_arc_input == None:
         min_diameter_pix = int(np.median(beam_diameter_arcsec_array)/dpix)
     else:
@@ -580,10 +596,15 @@ def source_extent_script(data_table, path_to_radio_file, initial_map_size_pix_in
     else: core_number = core_no_input 
         
     source_extent_results = p_map(find_source_extent,
-                                    [data_table[i:(i+1)] for i in range(len(data_table))],num_cpus=core_number)
+                                    [data_table[i:(i+1)] for i in range(len(data_table))],
+                                    [path_to_radio_file for i in range(len(data_table))],
+                                    [path_to_results for i in range(len(data_table))],
+                                    [initial_map_size_pix for i in range(len(data_table))],
+                                    [min_diameter_pix for i in range(len(data_table))],
+                                    num_cpus=core_number)
     #a = find_source_extent(data_table[data_table['ID'].values=='ID_625_44118'])
     all_sources_dict = pd.concat(source_extent_results)
-    all_sources_dict = associate_sources_final(all_sources_dict)
+    all_sources_dict = associate_sources_final(all_sources_dict,path_to_radio_file)
     #filter_associated = (all_sources_dict['ID'].values==all_sources_dict['associated_with'].values)
     #all_sources_dict = all_sources_dict[filter_associated]
     
