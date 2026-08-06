@@ -30,6 +30,7 @@ import warnings
 # Convert RuntimeWarning into an exception
 warnings.filterwarnings("error", category=RuntimeWarning)
 warnings.filterwarnings(action='ignore', category=SpectralCubeWarning)
+warnings.filterwarnings("ignore", category=StokesWarning)
 
 
 # get sky coordinates in degrees from pixel coordinates
