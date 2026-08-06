@@ -158,7 +158,22 @@ def ini_plot(x_pix_coord,y_pix_coord,ra,dec,source_ID):
                                  cutout_size=cutout_size,
                                  single_outfile=False)
         wcs_vis = WCS(output_files.fits_cutouts[0][1].header)
-    except: wcs_vis = wcs_radio_image
+    except: 
+        try:
+            wcs_vis = WCS(g[0].header)
+            ra = round(ra,4)
+            dec = round(dec,4)
+            width_arc = round(image_arc_width,6)
+            
+            center_coord = SkyCoord(ra,dec, unit="deg")
+            cutout_size = [width_arc/wcs_vis.wcs.cd[1][1]/3600, width_arc/3600/wcs_vis.wcs.cd[1][1]]
+            output_files = FITSCutout(input_files=[file_g],
+                                     coordinates=center_coord,
+                                     cutout_size=cutout_size,
+                                     single_outfile=False)
+            wcs_vis = WCS(output_files.fits_cutouts[0][1].header)
+        except:
+            wcs_vis = wcs_radio_image
 
             
     for ax in axs[2, 5:]:
@@ -468,7 +483,6 @@ def optical_image_plot(axvisimage,sources_dict,source,beam_radius_pixel):
     
     try:
         file_g = glob.glob(path_to_optical_images+'/*_images_filter_R/*%s_*.fits'%(source_ID))[0]
-   
         file_b = glob.glob(path_to_optical_images+'/*_images_filter_G/*%s_*.fits'%(source_ID))[0]
         file_r = glob.glob(path_to_optical_images+'/*_images_filter_I/*%s_*.fits'%(source_ID))[0]
         
@@ -476,31 +490,53 @@ def optical_image_plot(axvisimage,sources_dict,source,beam_radius_pixel):
         g=fits.open(file_g)
         b = fits.open(file_b)
         
-    
-        wcs_vis = WCS(g[1].header)
-        center_coord = SkyCoord(ra,dec, unit="deg")
-        cutout_size = [width_arc/wcs_vis.wcs.cd[1][1]/3600, width_arc/3600/wcs_vis.wcs.cd[1][1]]
-    
-        output_files = FITSCutout(input_files=[file_g,file_b,file_r],
-                                 coordinates=center_coord,
-                                 cutout_size=cutout_size,
-                                 single_outfile=False)
-        r_image=np.sqrt(np.absolute(output_files.fits_cutouts[2][1].data))
-    
-        g_image=np.sqrt(np.absolute(output_files.fits_cutouts[0][1].data))
-        b_image=np.sqrt(np.absolute(output_files.fits_cutouts[1][1].data))
-        wcs_vis = WCS(output_files.fits_cutouts[2][1].header)
-    
+        try:
+            wcs_vis = WCS(g[1].header)
+            center_coord = SkyCoord(ra,dec, unit="deg")
+            cutout_size = [width_arc/wcs_vis.wcs.cd[1][1]/3600, width_arc/3600/wcs_vis.wcs.cd[1][1]]
+        
+            output_files = FITSCutout(input_files=[file_g,file_b,file_r],
+                                     coordinates=center_coord,
+                                     cutout_size=cutout_size,
+                                     single_outfile=False)
+            r_image=np.sqrt(np.absolute(output_files.fits_cutouts[2][1].data))
+        
+            g_image=np.sqrt(np.absolute(output_files.fits_cutouts[0][1].data))
+            b_image=np.sqrt(np.absolute(output_files.fits_cutouts[1][1].data))
+            wcs_vis = WCS(output_files.fits_cutouts[2][1].header)
+
+            min_r,min_b,min_g = np.min(r_image),np.min(b_image),np.min(g_image)
+            max_r,max_b,max_g = np.max(r_image),np.max(b_image),np.max(g_image)
+            
+            
+            rgb = make_lupton_rgb(r_image*0.9,g_image,b_image*1.3,Q=2.5,stretch=1.1)
+        except:
+            wcs_vis = WCS(g[0].header)
+            center_coord = SkyCoord(ra,dec, unit="deg")
+            cutout_size = [width_arc/wcs_vis.wcs.cd[1][1]/3600, width_arc/3600/wcs_vis.wcs.cd[1][1]]
+        
+            output_files = FITSCutout(input_files=[file_g,file_b,file_r],
+                                     coordinates=center_coord,
+                                     cutout_size=cutout_size,
+                                     single_outfile=False)
+            r_image=np.sqrt(np.absolute(output_files.fits_cutouts[2][1].data))
+        
+            g_image=np.sqrt(np.absolute(output_files.fits_cutouts[0][1].data))
+            b_image=np.sqrt(np.absolute(output_files.fits_cutouts[1][1].data))
+            wcs_vis = WCS(output_files.fits_cutouts[2][1].header)
+            
+            min_r,min_b,min_g = np.min(r_image),np.min(b_image),np.min(g_image)
+            max_r,max_b,max_g = np.max(r_image),np.max(b_image),np.max(g_image)
+            
+            
+            rgb = make_lupton_rgb(r_image*0.9,g_image,b_image*1.3,Q=1.5,stretch=0.3)
+            
         # r_image=np.sqrt(np.absolute(r[1].data))
         # g_image=np.sqrt(np.absolute(g[1].data))
         # b_image=np.sqrt(np.absolute(b[1].data))
         
         
-        min_r,min_b,min_g = np.min(r_image),np.min(b_image),np.min(g_image)
-        max_r,max_b,max_g = np.max(r_image),np.max(b_image),np.max(g_image)
         
-        
-        rgb = make_lupton_rgb(r_image*0.9,g_image,b_image*1.3,Q=2.5,stretch=1.1)
         axvisimage.imshow(rgb,origin='lower')
 
         # plot the cross hair
