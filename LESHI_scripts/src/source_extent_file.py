@@ -23,9 +23,13 @@ import matplotlib.pyplot as plt
 
 
 import warnings
+from spectral_cube.utils import StokesWarning
+
 
 # Convert RuntimeWarning into an exception
 warnings.filterwarnings("error", category=RuntimeWarning)
+warnings.filterwarnings("ignore", category=StokesWarning)
+
 
 def sky_coord_in_deg_from_pix(x_pix_coord,y_pix_coord,wcs):
     skycoord = SkyCoord.from_pixel(xp=x_pix_coord,yp=y_pix_coord, wcs=wcs)
