@@ -62,12 +62,15 @@ def log_prior(x,theta):
 
 def log_probability(theta, x, y, yerr):
     lp = log_prior(x,theta)
+    lg = log_likelihood(theta, x, y, yerr)
     if not np.isfinite(lp):
         return -np.inf
-    return lp + log_likelihood(theta, x, y, yerr)
+    if not np.isfinite(lg):
+        return -np.inf
+    return lp + lg
 
 def gauss(x, H, A, x0, sigma): 
-            return H + A * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
+    return H + A * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
     
 def fit_gauss(x,y):
     H_0, A_0, x0_0, sigma_0 = 0,np.abs(np.nanmax(y)),x[np.nanargmax(y)]-1,3
