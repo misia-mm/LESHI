@@ -76,6 +76,7 @@ def gauss(x, H, A, x0, sigma):
 def fit_gauss(x,y):
     H_0, A_0, x0_0, sigma_0 = 0,np.abs(np.nanmax(y)),x[np.nanargmax(y)]-1,3
     if x0_0==0: x0_0=1
+    if A_0<0: A_0=1
     pos = [H_0, A_0, x0_0, sigma_0] + 1e-5 * np.random.randn(32, 4)
     
     nwalkers, ndim = pos.shape
@@ -152,11 +153,18 @@ def check_source_gaussian_fit(found_sources_dict,params):
             channels=np.arange(flux_cubelet_start,flux_cubelet_end,1)
             
             # check spectrum
-            found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('rsqr')], \
-            found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('gauss_x0')], \
-            found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('gauss_sigma')], \
-            found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('gauss_A')], \
-            found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('gauss_H')] = fit_gauss(channels,flux)
+            try:
+                found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('rsqr')], \
+                found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('gauss_x0')], \
+                found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('gauss_sigma')], \
+                found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('gauss_A')], \
+                found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('gauss_H')] = fit_gauss(channels,flux)
+            except:
+                found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('rsqr')], \
+                found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('gauss_x0')], \
+                found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('gauss_sigma')], \
+                found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('gauss_A')], \
+                found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('gauss_H')]  = 0,integrated_image_central_channel,0,0,0
             
             if found_sources_dict['rsqr'].values[source]<rsqr_threshold:
                 found_sources_dict.iloc[source,found_sources_dict.columns.get_loc('failed_spectral_fit')] = 1
