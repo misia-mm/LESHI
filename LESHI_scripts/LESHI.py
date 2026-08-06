@@ -12,7 +12,7 @@ def source_finder(data_cube, path_to_results = "./",
     
     Parameters
     ----------
-    data_file : str
+    data_cube : str
         Path to the datacube to perform source finding on.
 
     path_to_results : str
@@ -150,7 +150,7 @@ def get_opt_cutout(ID,ra,dec,width_arc = 100, filters = ['G','R','I'], survey = 
     if survey == 'LegacySurvey':
         if not hasattr(ra, '__iter__'):
             ra,dec, ID, width_arc = np.array([ra]),np.array([dec]),np.array([ID]),np.array([width_arc]), 
-        get_opt_cutout_file.get_LG_image(ID,ra,dec,width_arc, filters, path_to_images)
+        get_opt_cutout_file.get_LS_image(ID,ra,dec,width_arc, filters, path_to_images)
         
     if survey == 'HSC':
         if hasattr(ra, '__iter__'):
@@ -182,10 +182,38 @@ def source_hi_mass(data_table, data_cube, path_to_contours='./', path_to_results
     df = hi_mass_file.hi_mass_script(data_table, data_cube, path_to_contours, path_to_results, core_no)
     return df
     
-def source_extent(data_table, data_cube, min_window_width_pix=100, min_diameter_arc=None,path_to_results='./',core_no=None):
+def source_extent(data_table, data_cube, min_window_width_pix=100, min_diameter_pix=None,path_to_results='./',core_no=None):
+    """Find full extent of the sources. 
+    
+    Parameters
+    ----------
+    data_table : str
+        Path to the csv data table with detenction coordinates (needed keywords are: 'ID', 'RA_deg', 'Dec_deg', 'frequency_Hz').
+
+    data_cube : str
+        Path to the datacube to perform source finding on.
+
+    path_to_results : str
+        Path to the directory where the results will be saved (default = "./").
+
+    min_window_width_pix : int
+        Initial width of the cubelet volume around the source (default = 100).
+
+    min_diameter_pix : int
+        Minimum diameter the found contour should have, if the contour is smaller than min_diameter_pix, script outputs circular contour with diameter of min_diameter_pix (defualt = beamsize).
+
+    core_no : int
+        Number of cores to use for parallelisation 
+    
+    Returns
+    ------
+    output : pandas data frame
+        Function returns the data table with extent of the sources, the table is also saved in the specified directory along with contours and quick extent plots.
+    """
+    
     from .src import source_extent_file
   
-    df = source_extent_file.source_extent_script(data_table, data_cube, min_window_width_pix, min_diameter_arc, path_to_results, core_no)
+    df = source_extent_file.source_extent_script(data_table, data_cube, min_window_width_pix, min_diameter_pix, path_to_results, core_no)
     return df
 
 def emission_plot(data_table, data_cube, path_to_optical_images='./optical_images/', path_to_results='./',
