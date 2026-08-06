@@ -46,6 +46,11 @@ def channel_to_frequency(channel,wave0,wavedelta,channel0):
     frequency = wave0+wavedelta*(channel-channel0)
     return frequency
 
+def frequency_to_channel(frequency,wcs):
+    wave0,wavedelta,channel0 = wcs.wcs.crval[2],wcs.wcs.cdelt[2],wcs.wcs.crpix[2]
+    channel = (frequency-wave0)/wavedelta+channel0
+    return channel
+
 def gauss(x, H, A, x0, sigma): 
             return H + A * np.exp(-(x - x0) ** 2 / (2 * sigma ** 2))
 
@@ -139,7 +144,7 @@ def ini_plot(x_pix_coord,y_pix_coord,ra,dec,source_ID):
     axradioimage = fig.add_subplot(gs[2, 0:5],projection=wcs_radio_image)
 
     try:
-        file_g = glob.glob(path_to_optical_images+'/optical_images_filter_R/*%s_*.fits'%(source_ID))[0]
+        file_g = glob.glob(path_to_optical_images+'/*_images_filter_R/*%s_*.fits'%(source_ID))[0]
         g=fits.open(file_g)
         wcs_vis = WCS(g[1].header)
         ra = round(ra,4)
@@ -463,10 +468,10 @@ def optical_image_plot(axvisimage,sources_dict,source,beam_radius_pixel):
     width_arc = round(image_pixel_width*dpix,6)
     
     try:
-        file_g = glob.glob(path_to_optical_images+'/optical_images_filter_R/*%s_*.fits'%(source_ID))[0]
+        file_g = glob.glob(path_to_optical_images+'/*_images_filter_R/*%s_*.fits'%(source_ID))[0]
    
-        file_b = glob.glob(path_to_optical_images+'/optical_images_filter_G/*%s_*.fits'%(source_ID))[0]
-        file_r = glob.glob(path_to_optical_images+'/optical_images_filter_I/*%s_*.fits'%(source_ID))[0]
+        file_b = glob.glob(path_to_optical_images+'/*_images_filter_G/*%s_*.fits'%(source_ID))[0]
+        file_r = glob.glob(path_to_optical_images+'/*_images_filter_I/*%s_*.fits'%(source_ID))[0]
         
         r = fits.open(file_r)
         g=fits.open(file_g)
@@ -498,21 +503,21 @@ def optical_image_plot(axvisimage,sources_dict,source,beam_radius_pixel):
         
         rgb = make_lupton_rgb(r_image*0.9,g_image,b_image*1.3,Q=2.5,stretch=1.1)
         axvisimage.imshow(rgb,origin='lower')
+
+        # plot the cross hair
+        axvisimage.axvline((rgb.shape[0]-1)/2,color='gray',ls='--',alpha=0.3)
+        axvisimage.axhline((rgb.shape[1]-1)/2,color='gray',ls='--',alpha=0.3)
     except Exception:
         traceback.print_exc()
-        print(path_to_optical_images+'/optical_images_filter_R/*%s_*.fits'%(source_ID))
-        print(output_files.fits_cutouts)
+        print(path_to_optical_images+'/*_images_filter_R/*%s_*.fits'%(source_ID))
+        
     
     # mark beam
     # circle1 = plt.Circle((r_image.shape[0]/2, r_image.shape[0]/2), r_image.shape[0]/image_pixel_width*beam_radius_pixel, color='white',fill=False,ls='--')
     # axvisimage.add_patch(circle1)
         
 
-    # plot the cross hair
-    axvisimage.axvline((rgb.shape[0]-1)/2,color='gray',ls='--',alpha=0.3)
-    axvisimage.axhline((rgb.shape[1]-1)/2,color='gray',ls='--',alpha=0.3)
-
-
+    
 def info_about_target(source_dict,source,axflaginfo, axspecfitinfo, axcoordinfo,beam_diameter):
     # coordinates
     
@@ -587,20 +592,24 @@ def make_plot(sources_dict):
         ra, dec = (sources_dict['RA_deg'].values)[source], (sources_dict['Dec_deg'].values)[source]
         sky_coords =SkyCoord(ra, dec, unit="deg",frame="fk5")
         x_pix_coord, y_pix_coord = skycoord_to_pixel(sky_coords,data_cube_wcs)
-        z_channel, sigma =  (sources_dict['z_channel_center'].values)[source], ((sources_dict['z_channel_max'].values)[source]-(sources_dict['z_channel_min'].values)[source])/4
-        if (sources_dict['z_channel_center'].values)[source]==-99: z_channel = (sources_dict['gauss_x0'].values)[source]
+        
+        try:
+            z_channel, sigma =  (sources_dict['z_channel_center'].values)[source], ((sources_dict['z_channel_max'].values)[source]-(sources_dict['z_channel_min'].values)[source])/4
+            if (sources_dict['z_channel_center'].values)[source]==-99: z_channel = (sources_dict['gauss_x0'].values)[source]
+    
+            image_pixel_width = int(sources_dict['contour_diameter_arc'].values[source]*2/dpix)
+            if sources_dict['contour_diameter_arc'].values[source]>200:image_pixel_width = int(sources_dict['contour_diameter_arc'].values[source]*1.1/dpix)
+        except:
+            z_channel = (sources_dict['gauss_x0'].values)[source]
+            image_pixel_width = 0
+            sigma = (sources_dict['gauss_sigma'].values)[source]
+        
         x_pix_coord,y_pix_coord,z_channel  = int(x_pix_coord),int(y_pix_coord),int(z_channel)
-        
-        image_pixel_width = int(sources_dict['contour_diameter_arc'].values[source]*2/dpix)
-        if sources_dict['contour_diameter_arc'].values[source]>200:image_pixel_width = int(sources_dict['contour_diameter_arc'].values[source]*1.1/dpix)
         if image_pixel_width<image_pixel_width_min: image_pixel_width = image_pixel_width_min
-        image_arc_width = image_pixel_width*dpix
-        
-        spectrum_length = sigma*4*6
         if spectrum_length<spectrum_length_min: spectrum_length = spectrum_length_min
-        
-        
-
+        image_arc_width = image_pixel_width*dpix
+        spectrum_length = sigma*4*6
+    
         # spectrum range
         wavelength_range_left, wavelength_range_right = int(z_channel-spectrum_length/2), int(z_channel+spectrum_length/2)
         if wavelength_range_left<0: wavelength_range_left=2
