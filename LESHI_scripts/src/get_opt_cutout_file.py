@@ -22,7 +22,7 @@ def get_LS_image(ID_array,ra_array,dec_array,width_arc_array, filters,path_to_da
         for photo_filter in filters:
             # formulate the link from which wget will download the image, the link depends on the coordinates and size of the cutout, for example:
             #       'http://www.legacysurvey.org/viewer/fits-cutout?ra=3.5167&dec=-23.1827&layer=ls-dr10&pixscale=0.262&size=5000&bands=g'
-            link = 'http://www.legacysurvey.org/viewer/fits-cutout?ra=%s&dec=%s&layer=ls-dr10&pixscale=%s&size=%s&bands=%s'%(ra,dec,pixscale,size,photo_filter)
+            link = 'http://www.legacysurvey.org/viewer/fits-cutout?ra=%s&dec=%s&layer=ls-dr10&pixscale=%s&size=%s&bands=%s'%(ra,dec,pixscale,int(size),photo_filter.lower())
                    
             # formulate the file name in which wget will save the file, for example:
             # G_image_cutout_ID.fits
