@@ -4,8 +4,8 @@ import os
 import shutil
 import glob
 
-# get LG image
-def get_LG_image(ID_array,ra_array,dec_array,width_arc_array, filters,path_to_data):   
+# get LS image
+def get_LS_image(ID_array,ra_array,dec_array,width_arc_array, filters,path_to_data):   
     for source in range(len(ra_array)):
         ID = ID_array[source]
         ra = round(ra_array[source],4)
@@ -24,12 +24,12 @@ def get_LG_image(ID_array,ra_array,dec_array,width_arc_array, filters,path_to_da
                    
             # formulate the file name in which wget will save the file, for example:
             # G_image_cutout_ID.fits
-            file_name = '%sLegacySurvey_images_%s/%s_%s_image_cutout.fits'%(path_to_data,photo_filter,photo_filter,ID)
+            file_name = '%s/LS_images_filter_%s/%s_%s_image_cutout.fits'%(path_to_data,photo_filter,photo_filter,ID)
             
             # create directories for the filter images
-            path_exist = os.path.exists('%s/optical_images_filter_%s'%(path_to_data,photo_filter))
+            path_exist = os.path.exists('%s/LS_images_filter_%s'%(path_to_data,photo_filter))
             if not path_exist:
-               os.makedirs('%s/optical_images_filter_%s'%(path_to_data,photo_filter))
+               os.makedirs('%s/LS_images_filter_%s'%(path_to_data,photo_filter))
     
             # download the images
             os.system('wget --no-verbose -O %s "%s"'%(file_name,username,password,link))       
@@ -46,31 +46,31 @@ def get_HSC_image(ID,ra,dec,width_arc, filters,path_to_data):
         
         # formulate the link from which wget will download the image, the link depends on the coordinates and size of the cutout, for example:
         #       https://hsc-release.mtk.nao.ac.jp/das_cutout/pdr3/cgi-bin/cutout?ra=150.3135&dec=2.3063&sw=0.013889&sh=0.013889&type=coadd&image=on&filter=HSC-G&tract=&rerun=pdr3_dud_rev
-        link = 'https://hsc-release.mtk.nao.ac.jp/das_cutout/pdr3/cgi-bin/cutout?ra=%s&dec=%s&sw=%s&sh=%s&type=coadd&image=on&filter=HSC-%s&tract=&rerun=pdr3_wide'%(ra,dec,semi_width_deg,semi_width_deg,photo_filter)
+        link = 'https://hsc-release.mtk.nao.ac.jp/das_cutout/pdr2/cgi-bin/cutout?ra=%s&dec=%s&sw=%s&sh=%s&type=coadd&image=on&filter=HSC-%s&tract=&rerun=pdr2_wide'%(ra,dec,semi_width_deg,semi_width_deg,photo_filter)
                
         # formulate the file name in which wget will save the file, for example:
         # G_image_cutout_ID.fits
-        file_name = '%sHSC_images_%s/%s_%s_image_cutout.fits'%(path_to_data,photo_filter,photo_filter,ID)
+        file_name = '%s/HSC_images_filter_%s/%s_%s_image_cutout.fits'%(path_to_data,photo_filter,photo_filter,ID)
         
         # create directories for the filter images
         path_exist = os.path.exists('%s/optical_images_filter_%s'%(path_to_data,photo_filter))
         if not path_exist:
-           os.makedirs('%s/optical_images_filter_%s'%(path_to_data,photo_filter))
+           os.makedirs('%s/HSC_images_filter_%s'%(path_to_data,photo_filter))
 
         # download the images
-        username = 'michalinamm' # these login details are mine, however it is very straightforward to register
-        password = 'xABd7uioeKC5HKvPYhIlchk2n/tpO1xYdZfk/JCZ'
+        username = 'leshi' # these login details are mine, however it is very straightforward to register
+        password = 'i+3kxud2jExtsQhdpYoE5J8FG7yzc6OlTABXdZ14'
         os.system('wget --no-verbose -O %s --user=%s --password=%s "%s"'%(file_name,username,password,link))       
     print('Finished dowloading cutouts')
 
 def get_HSC_image_in_bulk(ID_array,ra_array,dec_array,width_arc_array, filters,path_to_data):   
-    target_table = pd.DataFrame(data={'rerun':np.full(len(ra_array),'pdr3_wide'),'ra':np.round(ra_array,4),'dec':np.round(dec_array,4),'sw':np.round(width_arc_array/2/3600,6),'sh':np.round(width_arc_array/2/3600,6)})
+    target_table = pd.DataFrame(data={'rerun':np.full(len(ra_array),'pdr2_wide'),'ra':np.round(ra_array,4),'dec':np.round(dec_array,4),'sw':np.round(width_arc_array/2/3600,6),'sh':np.round(width_arc_array/2/3600,6)})
     
     for photo_filter in filters:
         # create directories for the filter images
-        path_exist = os.path.exists('%s/optical_images_filter_%s'%(path_to_data,photo_filter))
+        path_exist = os.path.exists('%s/HSC_images_filter_%s'%(path_to_data,photo_filter))
         if not path_exist:
-           os.makedirs('%s/optical_images_filter_%s'%(path_to_data,photo_filter))
+           os.makedirs('%s/HSC_images_filter_%s'%(path_to_data,photo_filter))
 
         # prepare a table to upload coordinates
         target_table['filter'] = np.full(len(ra_array),'HSC-'+photo_filter)
@@ -82,8 +82,8 @@ def get_HSC_image_in_bulk(ID_array,ra_array,dec_array,width_arc_array, filters,p
             file.close()
             
         # download the images
-        username = 'michalinamm' # these login details are mine, however it is very straightforward to register
-        password = 'xABd7uioeKC5HKvPYhIlchk2n/tpO1xYdZfk/JCZ'
+        username = 'leshi' # these login details are mine, however it is very straightforward to register
+        password = 'i+3kxud2jExtsQhdpYoE5J8FG7yzc6OlTABXdZ14'
         curl_command = 'curl https://hsc-release.mtk.nao.ac.jp/das_cutout/pdr3/cgi-bin/cutout --form list=@temp_target_table.txt --user %s:%s | tar xvf -'%(username,password)
         os.system(curl_command)   
 
@@ -95,11 +95,11 @@ def get_HSC_image_in_bulk(ID_array,ra_array,dec_array,width_arc_array, filters,p
 
                 # formulate the file name to which save the file, for example:
                 # G_ID_12_1234_image_cutout.fits
-                file_name = '%s/optical_images_filter_%s/%s_%s_image_cutout.fits'%(path_to_data,photo_filter,photo_filter,ID_array[source])
+                file_name = '%s/HSC_images_filter_%s/%s_%s_image_cutout.fits'%(path_to_data,photo_filter,photo_filter,ID_array[source])
                 os.system('mv %s %s'%(file,file_name))
             except:
                 print('missing file')
-                file_name = '%s/optical_images_filter_%s/%s_%s_image_cutout_fail.txt'%(path_to_data,photo_filter,photo_filter,ID_array[source])
+                file_name = '%s/HSC_images_filter_%s/%s_%s_image_cutout_fail.txt'%(path_to_data,photo_filter,photo_filter,ID_array[source])
                 with open(file_name, "w") as text_file:
                     text_file.write("failed to download the image")
                 
