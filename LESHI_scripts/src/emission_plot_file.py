@@ -362,7 +362,6 @@ def wide_spectrum_plot(axspectrumwide,wavelength_range_array_wide,x_coord,y_coor
     # xdata = channel_to_frequency(xdata,data_cube_wcs)/1E6
     # axspectrumwide.plot(xdata,busy_func,color='blue',label='busy function',lw=0.75,alpha=0.9)
     #axspectrumwide.plot(channel_to_frequency(xdata,data_cube_wcs)/1E6,bmpix*dfreq*gauss(xdata,sources_dict['H'].values[source],sources_dict['A'].values[source],sources_dict['x0'].values[source],sources_dict['sigma'].values[source],),color='blue',label='Gaussian function fit',lw=0.75,alpha=0.9)
-    z_channel = sources_dict['z_channel_center'].values[source]
 
     try:
         axspectrumwide.axvline(  1420.406/(sources_dict['z_spec'].values+1),color='gray',ls='--',alpha=0.2,lw=1,label='z$_{opt}$')
@@ -507,9 +506,8 @@ def optical_image_plot(axvisimage,sources_dict,source,beam_radius_pixel):
         # plot the cross hair
         axvisimage.axvline((rgb.shape[0]-1)/2,color='gray',ls='--',alpha=0.3)
         axvisimage.axhline((rgb.shape[1]-1)/2,color='gray',ls='--',alpha=0.3)
-    except Exception:
-        traceback.print_exc()
-        print(path_to_optical_images+'/*_images_filter_R/*%s_*.fits'%(source_ID))
+    except:
+        pass
         
     
     # mark beam
@@ -524,7 +522,8 @@ def info_about_target(source_dict,source,axflaginfo, axspecfitinfo, axcoordinfo,
     axcoordinfo.text(0.03,0.9,'DETECTION COORDINATES')
     sky_coords = SkyCoord(source_dict['RA_deg'].values[source],source_dict['Dec_deg'].values[source], frame="fk5", unit="deg")
     x_pix_coord, y_pix_coord = skycoord_to_pixel(sky_coords,data_cube_wcs)
-    axcoordinfo.text(0.03,0.75,'xpix ypix channel: '+str(int(x_pix_coord))+' '+str(int(y_pix_coord))+' '+str(round(source_dict['z_channel_center'].values[source])))
+    z_channel = frequency_to_channel(source_dict['frequency_Hz'].values[source],data_cube_wcs)
+    axcoordinfo.text(0.03,0.75,'xpix ypix channel: '+str(int(x_pix_coord))+' '+str(int(y_pix_coord))+' '+str(round(z_channel)))
     
     if sky_coords.dec.dms.d<0: zero_non_zero = '-'
     else: zero_non_zero='+'
@@ -605,10 +604,12 @@ def make_plot(sources_dict):
             sigma = (sources_dict['gauss_sigma'].values)[source]
         
         x_pix_coord,y_pix_coord,z_channel  = int(x_pix_coord),int(y_pix_coord),int(z_channel)
+        spectrum_length = sigma*4*6
+        
         if image_pixel_width<image_pixel_width_min: image_pixel_width = image_pixel_width_min
         if spectrum_length<spectrum_length_min: spectrum_length = spectrum_length_min
         image_arc_width = image_pixel_width*dpix
-        spectrum_length = sigma*4*6
+        
     
         # spectrum range
         wavelength_range_left, wavelength_range_right = int(z_channel-spectrum_length/2), int(z_channel+spectrum_length/2)
