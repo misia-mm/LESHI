@@ -14,6 +14,7 @@ from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord
 from spectral_cube import SpectralCube
 from spectral_cube.utils import SpectralCubeWarning
+from spectral_cube.utils import StokesWarning
 
 import matplotlib
 from matplotlib.colors import Normalize
