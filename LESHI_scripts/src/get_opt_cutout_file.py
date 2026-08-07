@@ -86,7 +86,7 @@ def get_HSC_image_in_bulk(ID_array,ra_array,dec_array,width_arc_array, filters,p
         # download the images
         username = 'leshi' # these login details are mine, however it is very straightforward to register
         password = 'i+3kxud2jExtsQhdpYoE5J8FG7yzc6OlTABXdZ14'
-        curl_command = 'curl https://hsc-release.mtk.nao.ac.jp/das_cutout/pdr3/cgi-bin/cutout --form list=@temp_target_table.txt --user %s:%s | tar xvf -'%(username,password)
+        curl_command = 'curl https://hsc-release.mtk.nao.ac.jp/das_cutout/pdr2/cgi-bin/cutout --form list=@temp_target_table.txt --user %s:%s | tar xvf -'%(username,password)
         os.system(curl_command)   
 
         # move and change file names appropriately
